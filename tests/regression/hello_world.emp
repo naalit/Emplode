@@ -1,0 +1,3 @@
+// Output: Hello, world!
+Var world = "world";
+PRINT("Hello, ", world, "!");
