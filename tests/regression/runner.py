@@ -3,18 +3,21 @@
 import subprocess
 
 # Make Emplode executable
-subprocess.run(["make", "quick"], cwd="../..")
-print()
-
 success = 0
 failure = 0
 
-for test in ["hello_world"]:
+for test in ["hello_world", "functions"]:
     # Find expected output
     file = open(test + ".emp", "r")
     line = file.readline()
-    assert(line.startswith("// Output: "))
-    output = line.lstrip("// Output: ").strip()
+    assert(line.startswith("// Output:"))
+    output = line.lstrip("// Output:").strip()
+    while True:
+        line = file.readline()
+        if line.startswith("//"):
+            output += "\n" + line.lstrip("//").strip()
+        else:
+            break
 
     # Run script and compare
     result = subprocess.run(["./Emplode", test+".emp"], text=True, capture_output=True)

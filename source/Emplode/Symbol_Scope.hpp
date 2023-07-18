@@ -209,6 +209,13 @@ namespace emplode {
       return Add<Symbol_Function>(name, fun, desc, this, CountParams<FUN_T>(), return_type);
     }
 
+    /// Add a new user-defined function, providing number of params separately.
+    template <typename FUN_T>
+    Symbol_Function & AddFunction(const std::string & name, const std::string & desc,
+                                  emp::TypeID return_type, size_t n_params, FUN_T fun) {
+      return Add<Symbol_Function>(name, fun, desc, this, n_params, return_type);
+    }
+
     /// Add a new function that is a standard part of the scripting language.
     template <typename FUN_T>
     Symbol_Function & AddBuiltinFunction(const std::string & name,  FUN_T fun,

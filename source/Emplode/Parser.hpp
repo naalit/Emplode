@@ -210,6 +210,27 @@ namespace emplode {
       return symbol_table->MakeObjSymbol(type_name, var_name, GetScope());
     }
 
+    /// Add a user-defined function
+    Symbol_Function & AddFunction(const std::string & name, const std::string & desc,
+        const std::string & ret_type, emp::vector<emp::Ptr<Symbol_Var>> params, emp::Ptr<ASTNode_Block> body) {
+      emp::TypeID ret_type_id = symbol_table->GetType(ret_type).GetTypeID();
+      auto fun = [params, body](const emp::vector<emp::Ptr<Symbol>> & args) {
+        if (args.size() != params.size()) {
+          std::cerr << "Expected " << params.size() << " arguments but got " << args.size() << std::endl;
+          exit(1);
+        }
+        for (int i = 0; i < args.size(); i++) {
+          auto param = params[i];
+          if (!param->CopyValue(*args[i])) {
+            std::cerr << "Error: failed to set function parameter " << param->GetName() << std::endl;
+            exit(1);
+          }
+        }
+        return body->Process();
+      };
+      return GetScope().AddFunction(name, desc, ret_type_id, params.size(), fun);      
+    }
+
     /// Add an instance of an event with an action that should be triggered.
     template <typename... Ts>
     void AddAction(Ts &&... args) { symbol_table->AddAction(std::forward<Ts>(args)...); }
@@ -441,7 +462,12 @@ namespace emplode {
     // Allow this statement to be a declaration if it begins with a type.
     if (decl_ok && state.IsType()) {
       Symbol & new_symbol = ParseDeclaration(state);
-  
+
+      // Functions can't be used while they're being defined, so return them now
+      if (new_symbol.IsFunction()) {
+        return emp::NewPtr<ASTNode_Leaf>(new_symbol);
+      }
+ 
       // If this symbol is a new scope, it can be populated now either directly (in braces)
       // or indirectly (with an assignment)
       if (new_symbol.IsScope()) {
@@ -504,6 +530,30 @@ namespace emplode {
     std::string type_name = state.UseLexeme();
     state.RequireID("Type name '", type_name, "' must be followed by variable to declare.");
     std::string var_name = state.UseLexeme();
+
+    if (state.AsLexeme() == "(") {
+      // This is a function
+      state.UseLexeme();
+      auto scope = state.AddScope(var_name, "Function scope.");
+      state.PushScope(scope);
+
+      emp::vector<emp::Ptr<Symbol_Var>> params;
+      while (state.AsChar() != ')') {
+        state.RequireID("Function parameters must be names (without types).");
+        std::string param_name = state.UseLexeme();
+        auto & param = state.AddLocalVar(param_name, "Function parameter.");
+        params.push_back(&param);
+        state.UseIfChar(',');                     // Skip comma if next (does allow trailing comma)
+      }
+      state.UseRequiredChar(')', "Function args must end in a ')'");
+
+      state.UseRequiredChar('{', "Function body must start with '{'");
+      auto body_block = ParseStatementList(state);
+      state.UseRequiredChar('}', "Function body must end with '{'");
+      state.PopScope();
+
+      return state.AddFunction(var_name, "Local function.", type_name, params, body_block);
+    }
 
     if (type_name == "Var") return state.AddLocalVar(var_name, "Local variable.");
     else if (type_name == "Struct") return state.AddScope(var_name, "Local struct");
