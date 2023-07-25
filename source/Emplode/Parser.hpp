@@ -226,7 +226,14 @@ namespace emplode {
             exit(1);
           }
         }
-        return body->Process();
+
+        auto result = body->Process();
+        if (result && result->IsReturn()) {
+          return result.DynamicCast<Symbol_Special>()->ReturnValue();
+        } else {
+          emp::Ptr<Symbol> ret = nullptr;
+          return ret;
+        }
       };
       return GetScope().AddFunction(name, desc, ret_type_id, params.size(), fun);      
     }
@@ -617,6 +624,12 @@ namespace emplode {
     else if (state.UseIfLexeme("BREAK")) { return MakeBreakLeaf(keyword_line); }
 
     else if (state.UseIfLexeme("CONTINUE")) { return MakeContinueLeaf(keyword_line); }
+
+    else if (state.UseIfLexeme("RETURN")) {
+      auto node = emp::NewPtr<ASTNode_Return>(keyword_line);
+      node->AddChild(ParseExpression(state));
+      return node;
+    }
 
     // If we made it this far, we have an error.  Identify and deal with it!
 

@@ -111,6 +111,9 @@ namespace emplode {
     virtual bool IsFunction() const { return false; }  ///< Is symbol a function?
     virtual bool IsObject() const { return false; }    ///< Is symbol associated with C++ object?
     virtual bool IsScope() const { return false; }     ///< Is symbol a full scope?
+
+    virtual bool IsInterrupt() const { return false; } ///< Is symbol an interrupt signal that should be propagated outwards?
+    virtual bool IsReturn() const { return false; }    ///< Is symbol a "return" signal?
     virtual bool IsContinue() const { return false; }  ///< Is symbol a "continue" signal?
     virtual bool IsBreak() const { return false; }     ///< Is symbol a "break" signal?
 
@@ -370,29 +373,36 @@ namespace emplode {
 
   class Symbol_Special : public Symbol {
   public:
-    enum Type { CONTINUE, BREAK, UNKNOWN };
+    enum Type { CONTINUE, BREAK, RETURN, UNKNOWN };
 
   private:
     using this_t = Symbol_Special;
     Type type;
+    symbol_ptr_t return_value;
 
     static std::string ToString(Type in_type) {
       switch (in_type) {
         case CONTINUE: return "CONTINUE";
         case BREAK: return "BREAK";
+        case RETURN: return "RETURN";
         default: return "UNKNOWN";
       }
     }
     std::string ToString() const { return ToString(type); }
 
   public:
-    Symbol_Special(Type in_type) : Symbol("__Special", ToString(in_type), nullptr), type(in_type) {}
+    Symbol_Special(Type in_type, symbol_ptr_t return_value = nullptr)
+      : Symbol("__Special", ToString(in_type), nullptr), type(in_type), return_value(return_value) {}
     std::string GetTypename() const override { return emp::to_string("[[Special::", ToString(), "]]"); }
 
     symbol_ptr_t Clone() const override { return emp::NewPtr<this_t>(*this); }
 
+    bool IsInterrupt() const override { return true; }
+    bool IsReturn() const override { return type == RETURN; }
     bool IsContinue() const override { return type == CONTINUE; }  ///< Is symbol a "continue" signal?
     bool IsBreak() const override { return type == BREAK; }  ///< Is symbol a "break" signal?
+
+    symbol_ptr_t ReturnValue() const { return return_value; }
   };
 
   /// A Symbol to transmit an error due to invalid parsing.

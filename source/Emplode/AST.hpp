@@ -221,7 +221,7 @@ namespace emplode {
       for (auto node : children) {
         symbol_ptr_t out = node->Process();                  // Process this line.
         if (!out) continue;                                  // No return symbol?  Keep going!
-        if (out->IsBreak() || out->IsContinue()) return out; // Propagate a break or continue
+        if (out->IsInterrupt()) return out;                  // Propagate a break or continue
         if (out->IsTemporary()) out.Delete();                // Clean up anything else, if needed
       }
       return nullptr;
@@ -238,6 +238,37 @@ namespace emplode {
       for (size_t i = 0; i < indent; ++i) os << " ";
       os << "ASTNode_Block: " << children.size() << " lines." << std::endl;
       for (auto child_ptr : children) child_ptr->PrintAST(os, indent+2);
+    }
+  };
+
+  /// Unary operations.
+  class ASTNode_Return : public ASTNode_Internal {
+  public:
+    ASTNode_Return(int _line=-1) { 
+      line_id = _line;
+    }
+
+    symbol_ptr_t Process() override {
+      emp_assert(children.size() == 1);
+      #ifndef NDEBUG
+      emp::notify::Verbose(
+        "Emplode::AST",
+        "AST: Processing return"
+      );
+      #endif
+      symbol_ptr_t result = children[0]->Process();
+      return emp::NewPtr<Symbol_Special>(Symbol_Special::RETURN, result);
+    }
+
+    void Write(std::ostream & os, const std::string & offset) const override { 
+      os << "RETURN ";
+      children[0]->Write(os, offset);
+    }
+
+    void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      for (size_t i = 0; i < indent; ++i) os << " ";
+      os << "ASTNode_RETURN" << std::endl;
+      for (auto child : children) child->PrintAST(os, indent+2);
     }
   };
 
@@ -388,7 +419,7 @@ namespace emplode {
       if (test != 0.0) out = children[1]->Process();              // Process if TRUE
       else if (children.size() > 2) out = children[2]->Process(); // Process if FALSE
 
-      if (out && (out->IsBreak() || out->IsContinue())) return out; // Propagate break/continue
+      if (out && (out->IsInterrupt())) return out; // Propagate break/continue
       if (out && out->IsTemporary()) out.Delete();                  // Clean up out, if needed
       return nullptr;
     }
@@ -432,6 +463,7 @@ namespace emplode {
         if (out) {
           if (out->IsBreak())     { break; }
           if (out->IsContinue())  { continue; }
+          if (out->IsReturn())    { return out; }
           if (out->IsTemporary()) { out.Delete(); }
         }
       }

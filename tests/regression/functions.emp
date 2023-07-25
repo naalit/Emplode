@@ -1,8 +1,8 @@
 // Output: 3
 // hello world
 Var Add(one, two) {
-    PRINT(one + two);
+    RETURN one + two;
 };
 Var one = 1;
-Add(one, 2);
-Add("hello", " world");
+PRINT(Add(one, 2));
+PRINT(Add("hello", " world"));
