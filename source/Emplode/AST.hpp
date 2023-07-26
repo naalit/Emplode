@@ -249,14 +249,15 @@ namespace emplode {
     }
 
     symbol_ptr_t Process() override {
-      emp_assert(children.size() == 1);
       #ifndef NDEBUG
       emp::notify::Verbose(
         "Emplode::AST",
         "AST: Processing return"
       );
       #endif
-      symbol_ptr_t result = children[0]->Process();
+      symbol_ptr_t result = nullptr;
+      if (children.size() > 0)
+        result = children[0]->Process();
       return emp::NewPtr<Symbol_Special>(Symbol_Special::RETURN, result);
     }
 

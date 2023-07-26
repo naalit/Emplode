@@ -212,7 +212,8 @@ namespace emplode {
 
     /// Add a user-defined function
     Symbol_Function & AddFunction(const std::string & name, const std::string & desc,
-        const std::string & ret_type, emp::vector<emp::Ptr<Symbol_Var>> params, emp::Ptr<ASTNode_Block> body) {
+        const std::string & ret_type, emp::vector<emp::Ptr<Symbol_Var>> params, emp::Ptr<ASTNode_Block> body,
+        emp::Ptr<Symbol_Scope> scope) {
       emp::TypeID ret_type_id = symbol_table->GetType(ret_type).GetTypeID();
       auto fun = [params, body](const emp::vector<emp::Ptr<Symbol>> & args) {
         if (args.size() != params.size()) {
@@ -235,6 +236,8 @@ namespace emplode {
           return ret;
         }
       };
+
+      // TODO scope and everything in it currently never get destroyed
       return GetScope().AddFunction(name, desc, ret_type_id, params.size(), fun);      
     }
 
@@ -541,8 +544,8 @@ namespace emplode {
     if (state.AsLexeme() == "(") {
       // This is a function
       state.UseLexeme();
-      auto scope = state.AddScope(var_name, "Function scope.");
-      state.PushScope(scope);
+      emp::Ptr<Symbol_Scope> scope = &state.AddScope(var_name, "Function scope.");
+      state.PushScope(*scope);
 
       emp::vector<emp::Ptr<Symbol_Var>> params;
       while (state.AsChar() != ')') {
@@ -559,7 +562,7 @@ namespace emplode {
       state.UseRequiredChar('}', "Function body must end with '{'");
       state.PopScope();
 
-      return state.AddFunction(var_name, "Local function.", type_name, params, body_block);
+      return state.AddFunction(var_name, "Local function.", type_name, params, body_block, scope);
     }
 
     if (type_name == "Var") return state.AddLocalVar(var_name, "Local variable.");
@@ -627,7 +630,9 @@ namespace emplode {
 
     else if (state.UseIfLexeme("RETURN")) {
       auto node = emp::NewPtr<ASTNode_Return>(keyword_line);
-      node->AddChild(ParseExpression(state));
+      // Allow return without a value if it's followed by a semicolon
+      if (state.AsChar() != ';')
+        node->AddChild(ParseExpression(state));
       return node;
     }
 

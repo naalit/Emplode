@@ -3,6 +3,10 @@
 Var Add(one, two) {
     RETURN one + two;
 };
+Var MyPrint(message) {
+    PRINT(message);
+    RETURN;
+};
 Var one = 1;
-PRINT(Add(one, 2));
-PRINT(Add("hello", " world"));
+MyPrint(Add(one, 2));
+MyPrint(Add("hello", " world"));
