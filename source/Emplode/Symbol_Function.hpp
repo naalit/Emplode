@@ -13,6 +13,7 @@
 
 #include <string>
 
+#include "AST.hpp"
 #include "emp/base/Ptr.hpp"
 #include "emp/base/notify.hpp"
 #include "emp/base/vector.hpp"
@@ -25,11 +26,13 @@
 namespace emplode {
 
   class Symbol_Function : public Symbol {
-  private:
-    using this_t = Symbol_Function;
+  protected:
     using symbol_ptr_t = emp::Ptr<Symbol>;
     using fun_t = symbol_ptr_t( const emp::vector<symbol_ptr_t> & );
     using std_fun_t = std::function< fun_t >;
+
+  private:
+    using this_t = Symbol_Function;
 
     struct FunInfo {
       std_fun_t fun;            // Unified-form function.
@@ -98,6 +101,54 @@ namespace emplode {
       }
       emp::notify::Exception("mabe::Symbol_Function::NO_OVERLOAD", msg);
       return nullptr;
+    }
+  };
+
+  class Symbol_UserFunction : public Symbol_Function {
+  private:
+    emp::Ptr<Symbol_Scope> own_scope;
+    emp::Ptr<ASTNode_Block> body;
+
+    static std_fun_t make_fun(emp::Ptr<ASTNode_Block> body, emp::vector<emp::Ptr<Symbol_Var>> &params) {
+      return [body, params](const emp::vector<emp::Ptr<Symbol>> & args) {
+          if (args.size() != params.size()) {
+            std::cerr << "Expected " << params.size() << " arguments but got " << args.size() << std::endl;
+            exit(1);
+          }
+          for (int i = 0; i < args.size(); i++) {
+            auto param = params[i];
+            if (!param->CopyValue(*args[i])) {
+              std::cerr << "Error: failed to set function parameter " << param->GetName() << std::endl;
+              exit(1);
+            }
+          }
+
+          auto result = body->Process();
+          if (result && result->IsReturn()) {
+            auto ret = result.DynamicCast<Symbol_Special>()->ReturnValue();
+            result.Delete();
+            return ret;
+          } else {
+            emp::Ptr<Symbol> ret = nullptr;
+            return ret;
+          }
+        };
+    }
+
+  public:
+    Symbol_UserFunction(const std::string & _name,
+                    emp::vector<emp::Ptr<Symbol_Var>> params,
+                    emp::Ptr<ASTNode_Block> body,
+                    const std::string & _desc,
+                    emp::Ptr<Symbol_Scope> _scope,
+                    emp::TypeID _ret_type,
+                    emp::Ptr<Symbol_Scope> own_scope)
+      : own_scope(own_scope), body(body),
+      Symbol_Function(_name, make_fun(body, params), _desc, _scope, params.size(), _ret_type) {}
+
+    ~Symbol_UserFunction() {
+      own_scope.Delete();
+      body.Delete();
     }
   };
 

@@ -215,30 +215,7 @@ namespace emplode {
         const std::string & ret_type, emp::vector<emp::Ptr<Symbol_Var>> params, emp::Ptr<ASTNode_Block> body,
         emp::Ptr<Symbol_Scope> scope) {
       emp::TypeID ret_type_id = symbol_table->GetType(ret_type).GetTypeID();
-      auto fun = [params, body](const emp::vector<emp::Ptr<Symbol>> & args) {
-        if (args.size() != params.size()) {
-          std::cerr << "Expected " << params.size() << " arguments but got " << args.size() << std::endl;
-          exit(1);
-        }
-        for (int i = 0; i < args.size(); i++) {
-          auto param = params[i];
-          if (!param->CopyValue(*args[i])) {
-            std::cerr << "Error: failed to set function parameter " << param->GetName() << std::endl;
-            exit(1);
-          }
-        }
-
-        auto result = body->Process();
-        if (result && result->IsReturn()) {
-          return result.DynamicCast<Symbol_Special>()->ReturnValue();
-        } else {
-          emp::Ptr<Symbol> ret = nullptr;
-          return ret;
-        }
-      };
-
-      // TODO scope and everything in it currently never get destroyed
-      return GetScope().AddFunction(name, desc, ret_type_id, params.size(), fun);      
+      return GetScope().AddUserFunction(name, desc, ret_type_id, params, body, scope);
     }
 
     /// Add an instance of an event with an action that should be triggered.

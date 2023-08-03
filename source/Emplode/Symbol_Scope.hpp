@@ -210,10 +210,10 @@ namespace emplode {
     }
 
     /// Add a new user-defined function, providing number of params separately.
-    template <typename FUN_T>
-    Symbol_Function & AddFunction(const std::string & name, const std::string & desc,
-                                  emp::TypeID return_type, size_t n_params, FUN_T fun) {
-      return Add<Symbol_Function>(name, fun, desc, this, n_params, return_type);
+    Symbol_Function & AddUserFunction(const std::string & name, const std::string & desc,
+                                  emp::TypeID return_type, emp::vector<emp::Ptr<Symbol_Var>> params,
+                                  emp::Ptr<ASTNode_Block> body, emp::Ptr<Symbol_Scope> scope) {
+      return Add<Symbol_UserFunction>(name, params, body, desc, this, return_type, scope);
     }
 
     /// Add a new function that is a standard part of the scripting language.

@@ -39,6 +39,7 @@
 #include "EventManager.hpp"
 #include "Symbol_Scope.hpp"
 #include "SymbolTableBase.hpp"
+#include "Symbol_Object.hpp"
 
 
 namespace emplode {

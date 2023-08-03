@@ -16,8 +16,6 @@
 #include "emp/base/vector.hpp"
 
 #include "Symbol.hpp"
-#include "Symbol_Scope.hpp"
-#include "Symbol_Object.hpp"
 #include "SymbolTableBase.hpp"
 
 namespace emplode {
