@@ -1,0 +1,6 @@
+// Output: b 10
+Struct m {
+    Var a = 10;
+    Var b = "b";
+};
+PRINT(m::b + " " + m::a);

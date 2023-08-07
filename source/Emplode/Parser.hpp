@@ -473,6 +473,13 @@ namespace emplode {
 
     /// Process a value (and possibly more!)
     emp::Ptr<ASTNode> cur_node = ParseValue(state);
+
+    while (state.UseIfLexeme("::")) {
+      state.RequireID("Expected member name after '::'");
+      std::string name = state.UseLexeme();
+      cur_node = emp::NewPtr<ASTNode_Ref>(cur_node, name);
+    }
+
     emp::Token op_token = state.AsToken();
     std::string op = state.AsLexeme();
 

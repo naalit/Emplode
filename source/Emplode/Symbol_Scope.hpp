@@ -270,5 +270,9 @@ namespace emplode {
     symbol_ptr_t Clone() const override { return emp::NewPtr<Symbol_Scope>(*this); }
   };
 
+  // This has to be here (or in another downstream file) because of include cycle issues
+  emp::Ptr<Symbol> ASTNode_Ref::Process() {
+    return scope->Process()->AsScope().GetSymbol(name);
+  }
 }
 #endif
