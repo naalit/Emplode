@@ -528,7 +528,8 @@ namespace emplode {
     if (state.AsLexeme() == "(") {
       // This is a function
       state.UseLexeme();
-      emp::Ptr<Symbol_Scope> scope = &state.AddScope(var_name, "Function scope.");
+      // Add a space to the scope name so it can't be used from the script
+      emp::Ptr<Symbol_Scope> scope = &state.AddScope(" " + var_name, "Function scope.");
       state.PushScope(*scope);
 
       emp::vector<emp::Ptr<Symbol_Var>> params;
