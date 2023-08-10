@@ -602,19 +602,20 @@ namespace emplode {
 
   class ASTNode_Ref : public ASTNode_Internal {
   private:
-    emp::Ptr<ASTNode> scope;
     std::string name;
 
   public:
-    ASTNode_Ref(emp::Ptr<ASTNode> scope, const std::string &name)
-      : scope(scope), name(name), ASTNode_Internal(name) {}
+    ASTNode_Ref(const std::string &name)
+      : name(name), ASTNode_Internal(name) {}
 
     symbol_ptr_t Process() override;
 
     void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      emp_assert(children.size() == 1);
+
       for (size_t i = 0; i < indent; ++i) os << " ";
       os << "ASTNode_Ref: " << name << std::endl;
-      scope->PrintAST(os, indent+2);
+      children[0]->PrintAST(os, indent+2);
     }
   };
 
