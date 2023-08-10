@@ -271,7 +271,7 @@ namespace emplode {
   };
 
   // This has to be here (or in another downstream file) because of include cycle issues
-  emp::Ptr<Symbol> ASTNode_Ref::Process() {
+  emp::Ptr<Symbol> ASTNode_Member::Process() {
     emp_assert(children.size() == 1);
 
     return children[0]->Process()->AsScope().GetSymbol(name);

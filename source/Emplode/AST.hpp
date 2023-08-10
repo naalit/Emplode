@@ -600,12 +600,12 @@ namespace emplode {
     }
   };
 
-  class ASTNode_Ref : public ASTNode_Internal {
+  class ASTNode_Member : public ASTNode_Internal {
   private:
     std::string name;
 
   public:
-    ASTNode_Ref(const std::string &name)
+    ASTNode_Member(const std::string &name)
       : name(name), ASTNode_Internal(name) {}
 
     symbol_ptr_t Process() override;

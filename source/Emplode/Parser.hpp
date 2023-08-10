@@ -477,7 +477,7 @@ namespace emplode {
     while (state.UseIfLexeme("::")) {
       state.RequireID("Expected member name after '::'");
       std::string name = state.UseLexeme();
-      auto node = emp::NewPtr<ASTNode_Ref>(name);
+      auto node = emp::NewPtr<ASTNode_Member>(name);
       node->AddChild(cur_node);
       cur_node = node;
     }
