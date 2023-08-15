@@ -190,29 +190,29 @@ namespace emplode {
     void PushScope(Symbol_Scope & _scope) { scope_stack.push_back(&_scope); }
     void PopScope() { scope_stack.pop_back(); }
 
-    Symbol & LookupSymbol(const std::string & var_name, bool scan_scopes) {
-      emp::Ptr<Symbol> out_symbol = GetScope().LookupSymbol(var_name, scan_scopes);
+    Var LookupSymbol(const std::string & var_name, bool scan_scopes) {
+      std::optional<Var> out_symbol = GetScope().LookupSymbol(var_name, scan_scopes);
       // If we can't find this identifier, throw an error.
-      if (out_symbol.IsNull()) {
+      if (!out_symbol.has_value()) {
         Error("'", var_name, "' does not exist as a parameter, variable, or type.",
               "  Current scope is '", GetScope().GetName(), "'");
       }
-      return *out_symbol;
+      return out_symbol.value();
     }
 
-    Symbol_Var & AddLocalVar(const std::string & name, const std::string & desc) {
+    Var AddLocalVar(const std::string & name, const std::string & desc) {
       return GetScope().AddLocalVar(name, desc);
     }
-    Symbol_Scope & AddScope(const std::string & name, const std::string & desc) {
+    Var AddScope(const std::string & name, const std::string & desc) {
       return GetScope().AddScope(name, desc);
     }
-    Symbol_Object & AddObject(const std::string & type_name, const std::string & var_name) {
+    Var AddObject(const std::string & type_name, const std::string & var_name) {
       return symbol_table->MakeObjSymbol(type_name, var_name, GetScope());
     }
 
     /// Add a user-defined function
-    Symbol_Function & AddFunction(const std::string & name, const std::string & desc,
-        const std::string & ret_type, emp::vector<emp::Ptr<Symbol_Var>> params, emp::Ptr<ASTNode_Block> body,
+    Var AddFunction(const std::string & name, const std::string & desc,
+        const std::string & ret_type, emp::vector<Var> params, emp::Ptr<ASTNode_Block> body,
         emp::Ptr<Symbol_Scope> scope) {
       emp::TypeID ret_type_id = symbol_table->GetType(ret_type).GetTypeID();
       return GetScope().AddUserFunction(name, desc, ret_type_id, params, body, scope);
@@ -258,7 +258,7 @@ namespace emplode {
     /// @param scan_scopes indicares if we should continue the search for variabels in
     ///        successively outer (lower) scopes.
     /// @return An AST leaf node representing the variable found.
-    [[nodiscard]] emp::Ptr<ASTNode_Leaf> ParseVar(ParseState & state,
+    [[nodiscard]] emp::Ptr<ASTNode_Var> ParseVar(ParseState & state,
                                                   bool create_ok=false,
                                                   bool scan_scopes=true);
 
@@ -279,7 +279,7 @@ namespace emplode {
                                                     size_t prec_limit=1000);
 
     /// Parse the declaration of a variable and return the newly created Symbol
-    Symbol & ParseDeclaration(ParseState & state);
+    Var ParseDeclaration(ParseState & state);
 
     /// Parse an event description.
     emp::Ptr<ASTNode> ParseEvent(ParseState & state);
@@ -308,7 +308,7 @@ namespace emplode {
   };
 
   // Load a variable name from the provided scope.
-  emp::Ptr<ASTNode_Leaf> Parser::ParseVar(ParseState & state, bool create_ok, bool scan_scopes)
+  emp::Ptr<ASTNode_Var> Parser::ParseVar(ParseState & state, bool create_ok, bool scan_scopes)
   {
     int start_line = state.GetLine();
     Debug("Running ParseVar(", state.AsString(), ",", create_ok, ",", scan_scopes,
@@ -344,18 +344,18 @@ namespace emplode {
     Debug("...looking up symbol '", var_name,
           "' starting at scope '", state.GetScopeName(),
           "'; scanning=", scan_scopes);
-    Symbol & cur_symbol = state.LookupSymbol(var_name, scan_scopes);
+    Var cur_symbol = state.LookupSymbol(var_name, scan_scopes);
 
     // If this variable just provided a scope, keep going.
     if (state.IsDots()) {
-      state.PushScope(cur_symbol.AsScope());
+      state.PushScope(cur_symbol.GetValue()->AsScope());
       auto result = ParseVar(state, create_ok, false);
       state.PopScope();
       return result;
     }
 
     // Otherwise return the variable as a leaf!
-    return emp::NewPtr<ASTNode_Leaf>(&cur_symbol, start_line);
+    return emp::NewPtr<ASTNode_Var>(cur_symbol, var_name, start_line);
   }
 
   // Load a value from the provided scope, which can come from a variable or a literal.
@@ -448,21 +448,21 @@ namespace emplode {
 
     // Allow this statement to be a declaration if it begins with a type.
     if (decl_ok && state.IsType()) {
-      Symbol & new_symbol = ParseDeclaration(state);
+      Var new_symbol = ParseDeclaration(state);
 
       // Functions can't be used while they're being defined, so return them now
-      if (new_symbol.IsFunction()) {
-        return emp::NewPtr<ASTNode_Leaf>(new_symbol);
+      if (new_symbol.GetValue()->IsFunction()) {
+        return emp::NewPtr<ASTNode_Var>(new_symbol, new_symbol.GetValue()->GetName());
       }
  
       // If this symbol is a new scope, it can be populated now either directly (in braces)
       // or indirectly (with an assignment)
-      if (new_symbol.IsScope()) {
+      if (new_symbol.GetValue()->IsScope()) {
         if (state.UseIfChar('{')) {
-          state.PushScope(new_symbol.AsScope());
+          state.PushScope(new_symbol.GetValue()->AsScope());
           emp::Ptr<ASTNode> out_node = ParseStatementList(state);
           state.PopScope();
-          state.UseRequiredChar('}', "Expected scope '", new_symbol.GetName(), "' to end with a '}'.");
+          state.UseRequiredChar('}', "Expected scope '", new_symbol.GetValue()->GetName(), "' to end with a '}'.");
           return out_node;
         }
       }      
@@ -522,7 +522,7 @@ namespace emplode {
   }
 
   // Parse an the declaration of a variable.
-  Symbol & Parser::ParseDeclaration(ParseState & state) {
+  Var Parser::ParseDeclaration(ParseState & state) {
     std::string type_name = state.UseLexeme();
     state.RequireID("Type name '", type_name, "' must be followed by variable to declare.");
     std::string var_name = state.UseLexeme();
@@ -531,15 +531,15 @@ namespace emplode {
       // This is a function
       state.UseLexeme();
       // Add a space to the scope name so it can't be used from the script
-      emp::Ptr<Symbol_Scope> scope = &state.AddScope(" " + var_name, "Function scope.");
+      emp::Ptr<Symbol_Scope> scope = emp::NewPtr<Symbol_Scope>(var_name, "Function scope", &state.GetScope());
       state.PushScope(*scope);
 
-      emp::vector<emp::Ptr<Symbol_Var>> params;
+      emp::vector<Var> params;
       while (state.AsChar() != ')') {
         state.RequireID("Function parameters must be names (without types).");
         std::string param_name = state.UseLexeme();
-        auto & param = state.AddLocalVar(param_name, "Function parameter.");
-        params.push_back(&param);
+        Var param = state.AddLocalVar(param_name, "Function parameter.");
+        params.push_back(param);
         state.UseIfChar(',');                     // Skip comma if next (does allow trailing comma)
       }
       state.UseRequiredChar(')', "Function args must end in a ')'");

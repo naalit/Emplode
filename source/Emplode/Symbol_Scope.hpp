@@ -16,6 +16,7 @@
 
 #include "emp/base/map.hpp"
 #include "emp/datastructs/map_utils.hpp"
+#include <optional>
 
 #include "Symbol.hpp"
 #include "Symbol_Function.hpp"
@@ -32,38 +33,27 @@ namespace emplode {
   protected:
     using symbol_ptr_t = emp::Ptr<Symbol>;
     using const_symbol_ptr_t = emp::Ptr<const Symbol>;
-    emp::map< std::string, symbol_ptr_t > symbol_map;   ///< Map of names to entries.
+    emp::map< std::string, Var > symbol_map;   ///< Map of names to entries.
 
     template <typename T, typename... ARGS>
-    T & Add(const std::string & name, ARGS &&... args) {
+    Var Add(const std::string & name, ARGS &&... args) {
       auto new_ptr = emp::NewPtr<T>(name, std::forward<ARGS>(args)...);
-      emp_assert(!emp::Has(symbol_map, name), "Do not redeclare functions or variables!",
+      emp_always_assert(!emp::Has(symbol_map, name), "Do not redeclare functions or variables!",
                  name);
-      symbol_map[name] = new_ptr;
-      return *new_ptr;
+      auto entry = symbol_map.insert({name, Var(new_ptr)});
+      return entry.first->second;
     }
 
     template <typename T, typename... ARGS>
-    T & AddBuiltin(const std::string & name, ARGS &&... args) {
-      T & result = Add<T>(name, std::forward<ARGS>(args)...);
-      result.SetBuiltin();
+    Var AddBuiltin(const std::string & name, ARGS &&... args) {
+      Var result = Add<T>(name, std::forward<ARGS>(args)...);
+      result.GetValue()->SetBuiltin();
       return result;
     }
 
   public:
     Symbol_Scope(const std::string & _name, const std::string & _desc, emp::Ptr<Symbol_Scope> _scope)
       : Symbol(_name, _desc, _scope) { }
-
-    Symbol_Scope(const Symbol_Scope & in) : Symbol(in) {
-      // Copy all defined variables/scopes/functions
-      for (auto [name, ptr] : symbol_map) { symbol_map[name] = ptr->Clone(); }
-    }
-    Symbol_Scope(Symbol_Scope &&) = default;
-
-    ~Symbol_Scope() {
-      // Clear up the symbol table.
-      for (auto [name, ptr] : symbol_map) { ptr.Delete(); }
-    }
 
     std::string GetTypename() const override { return "Scope"; }
 
@@ -87,7 +77,7 @@ namespace emplode {
 
       // Assignment to an existing Struct cannot create new variables; all must already exist.
       // Do not delete other existing entries.
-      for (const auto & [name, ptr] : in_scope.symbol_map) {
+      for (const auto & [name, var] : in_scope.symbol_map) {
         // If entry does not exist fail the copy.
         if (!emp::Has(symbol_map, name)) {
           std::cerr << "Trying to assign `" << in.GetName() << "' to '" << GetName()
@@ -95,9 +85,9 @@ namespace emplode {
           return false;
         }
 
-        if (ptr->IsFunction()) continue; // Don't copy functions.
+        if (var.GetValue()->IsFunction()) continue; // Don't copy functions.
 
-        bool success = symbol_map[name]->CopyValue(*ptr);
+        bool success = GetSymbol(name)->GetValue()->CopyValue(*var.GetValue());
         if (!success) {
           std::cerr << "Trying to assign `" << in.GetName() << "' to '" << GetName()
                     << "', but failed on `" << GetName() << "." << name << "`." << std::endl;
@@ -111,31 +101,23 @@ namespace emplode {
 
 
     /// Get a symbol out of this scope; 
-    symbol_ptr_t GetSymbol(std::string name) { return emp::Find(symbol_map, name, nullptr); }
+    std::optional<Var> GetSymbol(std::string name) {
+      auto result = symbol_map.find(name);
+      if (result == symbol_map.end()) {
+        return {};
+      } else {
+        return result->second;
+      }
+    }
 
     /// Lookup a variable, scanning outer scopes if needed
-    symbol_ptr_t LookupSymbol(const std::string & name, bool scan_scopes=true) override {
+    std::optional<Var> LookupSymbol(const std::string & name, bool scan_scopes=true) const {
       // See if this next symbol is in the var list.
       auto it = symbol_map.find(name);
 
       // If this name is unknown, check with the parent scope!
       if (it == symbol_map.end()) {
-        if (scope.IsNull() || !scan_scopes) return nullptr;  // No parent?  Just fail...
-        return scope->LookupSymbol(name);
-      }
-
-      // Otherwise we found it!
-      return it->second;
-    }
-
-    /// Lookup a variable, scanning outer scopes if needed (in const context!)
-    const_symbol_ptr_t LookupSymbol(const std::string & name, bool scan_scopes=true) const override {
-      // See if this symbol is in the var list.
-      auto it = symbol_map.find(name);
-
-      // If this name is unknown, check with the parent scope!
-      if (it == symbol_map.end()) {
-        if (scope.IsNull() || !scan_scopes) return nullptr;  // No parent?  Just fail...
+        if (scope.IsNull() || !scan_scopes) return {};  // No parent?  Just fail...
         return scope->LookupSymbol(name);
       }
 
@@ -146,7 +128,7 @@ namespace emplode {
     /// Add a configuration symbol that is linked to a variable - the incoming variable sets
     /// the default and is automatically updated when configs are loaded.
     template <typename VAR_T>
-    Symbol_Linked<VAR_T> & LinkVar(const std::string & name,
+    Var LinkVar(const std::string & name,
                                         VAR_T & var,
                                         const std::string & desc,
                                         bool is_builtin = false) {
@@ -157,7 +139,7 @@ namespace emplode {
     /// Add a configuration symbol that interacts through a pair of functions - the functions are
     /// automatically called any time the symbol value is accessed (get_fun) or changed (set_fun)
     template <typename VAR_T>
-    Symbol_LinkedFunctions<VAR_T> & LinkFuns(const std::string & name,
+    Var LinkFuns(const std::string & name,
                                             std::function<VAR_T()> get_fun,
                                             std::function<void(const VAR_T &)> set_fun,
                                             const std::string & desc,
@@ -169,17 +151,17 @@ namespace emplode {
     }
 
     /// Add an internal variable of type String.
-    Symbol_Var & AddLocalVar(const std::string & name, const std::string & desc) {
+    Var AddLocalVar(const std::string & name, const std::string & desc) {
       return Add<Symbol_Var>(name, 0.0, desc, this);
     }
 
     /// Add an internal scope inside of this one.
-    Symbol_Scope & AddScope(const std::string & name, const std::string & desc) {
+    Var AddScope(const std::string & name, const std::string & desc) {
       return Add<Symbol_Scope>(name, desc, this);
     }
 
     /// Add an internal scope inside of this one (defined in Symbol_Object.hpp)
-    Symbol_Object & AddObject(
+    Var AddObject(
       const std::string & name,
       const std::string & desc,
       emp::Ptr<EmplodeType> obj_ptr,
@@ -204,21 +186,21 @@ namespace emplode {
 
     /// Add a new user-defined function.
     template <typename FUN_T>
-    Symbol_Function & AddFunction(const std::string & name,  FUN_T fun,
+    Var AddFunction(const std::string & name,  FUN_T fun,
                                   const std::string & desc,  emp::TypeID return_type) {
       return Add<Symbol_Function>(name, fun, desc, this, CountParams<FUN_T>(), return_type);
     }
 
     /// Add a new user-defined function, providing number of params separately.
-    Symbol_Function & AddUserFunction(const std::string & name, const std::string & desc,
-                                  emp::TypeID return_type, emp::vector<emp::Ptr<Symbol_Var>> params,
+    Var AddUserFunction(const std::string & name, const std::string & desc,
+                                  emp::TypeID return_type, emp::vector<Var> params,
                                   emp::Ptr<ASTNode_Block> body, emp::Ptr<Symbol_Scope> scope) {
       return Add<Symbol_UserFunction>(name, params, body, desc, this, return_type, scope);
     }
 
     /// Add a new function that is a standard part of the scripting language.
     template <typename FUN_T>
-    Symbol_Function & AddBuiltinFunction(const std::string & name,  FUN_T fun,
+    Var AddBuiltinFunction(const std::string & name,  FUN_T fun,
                                          const std::string & desc,  emp::TypeID return_type) {
       return AddBuiltin<Symbol_Function>(name, fun, desc, this, CountParams<FUN_T>(), return_type);
     }
@@ -228,9 +210,9 @@ namespace emplode {
                                       size_t comment_offset=32) const {
 
       // Loop through all of the entires in this scope and Write them.
-      for (auto [name, ptr] : symbol_map) {
-        if (ptr->IsBuiltin()) continue; // Skip writing built-in entries.
-        ptr->Write(os, prefix, comment_offset);
+      for (auto [name, var] : symbol_map) {
+        if (var.GetValue()->IsBuiltin()) continue; // Skip writing built-in entries.
+        var.GetValue()->Write(os, prefix, comment_offset);
       }
 
       return *this;
@@ -248,8 +230,8 @@ namespace emplode {
       if (IsLocal()) cur_line += emp::to_string(GetTypename(), " ");
       cur_line += name;
 
-      bool has_body = emp::AnyOf(symbol_map, [](symbol_ptr_t ptr){ return !ptr->IsBuiltin(); });
-      
+      bool has_body = emp::AnyOf(symbol_map, [](Var var){ return !var.GetValue()->IsBuiltin(); });
+
       // Only open this scope if there are contents.
       cur_line += has_body ? " { " : ";";
       os << cur_line;
@@ -274,7 +256,7 @@ namespace emplode {
   emp::Ptr<Symbol> ASTNode_Member::Process() {
     emp_assert(children.size() == 1);
 
-    return children[0]->Process()->AsScope().GetSymbol(name);
+    return children[0]->Process()->AsScope().GetSymbol(name)->GetValue();
   }
 }
 #endif

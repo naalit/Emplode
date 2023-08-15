@@ -248,16 +248,6 @@ namespace emplode {
     // Try to copy another config symbol into this one; return true if successful.
     virtual bool CopyValue(const Symbol & ) { return false; }
 
-    /// If this symbol is a scope, we should be able to lookup other entries inside it.
-    virtual symbol_ptr_t LookupSymbol(const std::string & in_name, bool /* scan_scopes */=true) {
-      return (in_name == "") ? this : nullptr;
-    }
-    virtual emp::Ptr<const Symbol>
-    LookupSymbol(const std::string & in_name, bool /* scan_scopes */=true) const {
-      return (in_name == "") ? this : nullptr;
-    }
-    virtual bool Has(const std::string & in_name) const { return (bool) LookupSymbol(in_name); }
-
     /// If this symbol is a function, we should be able to call it.
     virtual symbol_ptr_t Call(const emp::vector<symbol_ptr_t> & args);
 
@@ -271,6 +261,7 @@ namespace emplode {
     operator EmplodeType&() { return *GetObjectPtr(); }
 
     /// Allocate a duplicate of this class.
+    /// This is a shallow clone, so any children or scope members will be passed by reference to the new instance.
     virtual symbol_ptr_t Clone() const = 0;
 
     virtual const Symbol & Write(std::ostream & os=std::cout, const std::string & prefix="",

@@ -1,6 +1,13 @@
 // Output: b 10
+// c 10
 Struct m {
     Var a = 10;
     Var b = "b";
 };
+PRINT(m::b + " " + m::a);
+
+Var Modify(q) {
+    q::b = "c";
+};
+Modify(m);
 PRINT(m::b + " " + m::a);

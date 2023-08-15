@@ -113,7 +113,7 @@ namespace emplode {
                                             *type_info_ptr, obj_owned);
 
       // Copy over all of the internal symbols.
-      for (auto [name, ptr] : symbol_map) { out->symbol_map[name] = ptr->Clone(); }
+      out->symbol_map = symbol_map;
       // @CAO: Will linkages be in place?
 
       return out;
@@ -121,7 +121,7 @@ namespace emplode {
   };
 
   // Definition needed to add an object to an existing scope.
-  Symbol_Object & Symbol_Scope::AddObject(
+  Var Symbol_Scope::AddObject(
     const std::string & name,
     const std::string & desc,
     emp::Ptr<EmplodeType> obj_ptr,

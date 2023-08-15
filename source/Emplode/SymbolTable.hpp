@@ -157,7 +157,7 @@ namespace emplode {
     }
 
     /// Make a new Symbol_Object using the provided *TypeInfo*, variable name, and scope.
-    Symbol_Object & MakeObjSymbol(
+    Var MakeObjSymbol(
       TypeInfo & type_info,
       const std::string & var_name,
       Symbol_Scope & scope
@@ -170,23 +170,22 @@ namespace emplode {
       emp::Ptr<EmplodeType> new_obj = type_info.MakeObj(var_name);
  
       // Setup a scope for this new type, linking the object to it.
-      Symbol_Object & new_obj_symbol =
-        scope.AddObject(var_name, type_desc, new_obj, type_info, is_config_owned);
+      Var new_obj_symbol = scope.AddObject(var_name, type_desc, new_obj, type_info, is_config_owned);
 
       // Let the new object know about its scope.
-      new_obj->Setup(new_obj_symbol);
+      new_obj->Setup(new_obj_symbol.GetValue()->AsScope());
 
       return new_obj_symbol;
     }
 
     /// Make a new Symbol_Object using the provided type NAME, variable name, and scope.
-    Symbol_Object & MakeObjSymbol(const std::string & type_name, const std::string & var_name,
+    Var MakeObjSymbol(const std::string & type_name, const std::string & var_name,
                                    Symbol_Scope & scope) {
       return MakeObjSymbol(*type_map[type_name], var_name, scope);
     }
 
     /// Make a new Symbol_Object using the provided *TypeID*, variable name, and scope.
-    Symbol_Object & MakeObjSymbol(emp::TypeID type_id, const std::string & var_name,
+    Var MakeObjSymbol(emp::TypeID type_id, const std::string & var_name,
                                    Symbol_Scope & scope) {
       return MakeObjSymbol(*typeid_map[type_id], var_name, scope);
     }

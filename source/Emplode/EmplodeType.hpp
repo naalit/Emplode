@@ -88,7 +88,7 @@ namespace emplode {
           return member_info.fun(*this, args);
         };
         symbol_ptr->AddFunction(member_info.name, linked_fun,
-                                member_info.desc, member_info.return_type).SetBuiltin();
+                                member_info.desc, member_info.return_type).GetValue()->SetBuiltin();
 
         // std::cout << "Adding member function '" << member_info.name << "' to object '"
         //           << symbol_ptr->GetName() << "'." << std::endl;
@@ -101,21 +101,21 @@ namespace emplode {
     /// Link a variable to a configuration entry - the value will default to the
     /// variables current value, but be updated when configs are loaded.
     template <typename VAR_T>
-    Symbol_Linked<VAR_T> & LinkVar(VAR_T & var,
-                                        const std::string & name,
-                                        const std::string & desc,
-                                        bool is_builtin = false) {
+    Var LinkVar(VAR_T & var,
+                const std::string & name,
+                const std::string & desc,
+                bool is_builtin = false) {
       return AsScope().LinkVar<VAR_T>(name, var, desc, is_builtin);
     }
 
     /// Link a configuration entry to a pair of functions - it automatically calls the set
     /// function when configs are loaded, and the get function when current value is needed.
     template <typename VAR_T>
-    Symbol_LinkedFunctions<VAR_T> & LinkFuns(std::function<VAR_T()> get_fun,
-                                            std::function<void(const VAR_T &)> set_fun,
-                                            const std::string & name,
-                                            const std::string & desc,
-                                            bool is_builtin = false) {
+    Var LinkFuns(std::function<VAR_T()> get_fun,
+                 std::function<void(const VAR_T &)> set_fun,
+                 const std::string & name,
+                 const std::string & desc,
+                 bool is_builtin = false) {
       return AsScope().LinkFuns<VAR_T>(name, get_fun, set_fun, desc, is_builtin);
     }
 
@@ -134,10 +134,10 @@ namespace emplode {
     /// Each option should include three arguments:
     /// The return value, the option name, and the option description.
     template <typename VAR_T, typename... Ts>
-    Symbol_LinkedFunctions<std::string> & LinkMenu(VAR_T & var,
-                                                  const std::string & name,
-                                                  const std::string & desc,
-                                                  const Ts &... entries) {
+    Var LinkMenu(VAR_T & var,
+                 const std::string & name,
+                 const std::string & desc,
+                 const Ts &... entries) {
       auto menu = emp::BuildObjVector<MenuEntry<VAR_T>, 3>(entries...);
 
       // Build the "get" function: take the current value of the menu and return the name.

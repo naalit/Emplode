@@ -20,6 +20,36 @@
 
 namespace emplode {
 
+  /// A variable representing a shared mutable reference to a Symbol
+  class Var {
+  private:
+    /// A pointer to a pointer so that we can update the value to any type of symbol
+    /// The inner pointer is not shared, though - it's owned by this variable
+    std::shared_ptr<emp::Ptr<Symbol>> ptr;
+
+  public:
+    /// Takes ownership of `initial_value`
+    Var(emp::Ptr<Symbol> initial_value) : ptr(std::make_shared<emp::Ptr<Symbol>>(initial_value)) {
+      (*ptr)->SetTemporary(false);
+    }
+    ~Var() {
+      if (ptr.use_count() == 1) {
+        ptr->Delete();
+      }
+    }
+
+    emp::Ptr<Symbol> GetValue() const {
+      return *ptr;
+    }
+
+    /// Takes ownership of `value`
+    void SetValue(emp::Ptr<Symbol> value) {
+      ptr->Delete();
+      *ptr = value;
+      (*ptr)->SetTemporary(false);
+    }
+  };
+
   /// Base class for all AST Nodes.
   class ASTNode {
   protected:
@@ -109,7 +139,52 @@ namespace emplode {
     }
   };
 
-  /// An ASTNode representing a leaf in the tree (i.e., a variable or literal)
+  class ASTNode_Var : public ASTNode {
+  protected:
+    Var var;
+    std::string name;
+
+  public:
+    ASTNode_Var(Var var, const std::string & name, int _line=-1)
+      : var(var), name(name)
+    {
+      line_id = _line;
+    }
+
+    const std::string & GetName() const override { return name; }
+    Symbol & GetSymbol() const { return *var.GetValue(); }
+
+    bool IsNumeric() const override { return GetSymbol().IsNumeric(); }
+    bool IsString() const override { return GetSymbol().IsString(); }
+    bool HasValue() const override { return true; }
+    bool HasNumericReturn() const override { return GetSymbol().HasNumericReturn(); }
+    bool HasStringReturn() const override { return GetSymbol().HasStringReturn(); }
+
+    bool IsLeaf() const override { return true; }
+
+    symbol_ptr_t Process() override { 
+      #ifndef NDEBUG
+      emp::notify::Verbose(
+        "Emplode::AST",
+        "AST: Calling var '",
+        name
+      );
+      #endif
+      return var.GetValue();
+    };
+
+    void Write(std::ostream & os, const std::string &) const override {
+      // Print the variable name
+      os << name;
+    }
+
+    void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      for (size_t i = 0; i < indent; ++i) os << " ";
+      os << "ASTNode_Var : " << GetSymbol().DebugString() << std::endl;
+    }
+  };
+
+  /// An ASTNode representing a literal symbol like a number or break/continue
   class ASTNode_Leaf : public ASTNode {
   protected:
     symbol_ptr_t symbol_ptr;  ///< Pointer to Symbol at this leaf.
@@ -146,16 +221,12 @@ namespace emplode {
     };
 
     void Write(std::ostream & os, const std::string &) const override {
-      // If this is a variable, print the variable name,
-      std::string output = symbol_ptr->GetName();
+      // Print the value of the literal
+      std::string output = symbol_ptr->AsString();
 
-      // If it is a literal, print the value.
-      if (output == "") {
-        output = symbol_ptr->AsString();
+      // If the symbol is a string, convert it to a string literal.
+      if (symbol_ptr->IsString()) output = emp::to_literal(output);
 
-        // If the symbol is a string, convert it to a string literal.
-        if (symbol_ptr->IsString()) output = emp::to_literal(output);
-      }
       os << output;
     }
 
@@ -522,6 +593,11 @@ namespace emplode {
       );
 
       symbol_ptr_t result = fun->Call(args);
+      if (result && result->IsError()) {
+        std::cerr << "Call error: ";
+        result->Write(std::cerr);
+        exit(1);
+      }
 
       // Cleanup and return
       for (auto arg : args) if (arg->IsTemporary()) arg.Delete();

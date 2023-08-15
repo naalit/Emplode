@@ -347,7 +347,7 @@ namespace emplode {
         os << prefix << "[Unknown symbol '" << symbol_name <<"'].\n";
         return false;
       }
-      symbol_ptr->Write(os, prefix, comment_offset);
+      symbol_ptr->GetValue()->Write(os, prefix, comment_offset);
       return true;
     }
 

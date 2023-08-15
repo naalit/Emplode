@@ -109,7 +109,7 @@ namespace emplode {
     emp::Ptr<Symbol_Scope> own_scope;
     emp::Ptr<ASTNode_Block> body;
 
-    static std_fun_t make_fun(emp::Ptr<ASTNode_Block> body, emp::vector<emp::Ptr<Symbol_Var>> &params) {
+    static std_fun_t make_fun(emp::Ptr<ASTNode_Block> body, emp::vector<Var> &params) {
       return [body, params](const emp::vector<emp::Ptr<Symbol>> & args) {
           if (args.size() != params.size()) {
             std::cerr << "Expected " << params.size() << " arguments but got " << args.size() << std::endl;
@@ -117,10 +117,7 @@ namespace emplode {
           }
           for (int i = 0; i < args.size(); i++) {
             auto param = params[i];
-            if (!param->CopyValue(*args[i])) {
-              std::cerr << "Error: failed to set function parameter " << param->GetName() << std::endl;
-              exit(1);
-            }
+            param.SetValue(args[i]->Clone());
           }
 
           auto result = body->Process();
@@ -137,7 +134,7 @@ namespace emplode {
 
   public:
     Symbol_UserFunction(const std::string & _name,
-                    emp::vector<emp::Ptr<Symbol_Var>> params,
+                    emp::vector<Var> params,
                     emp::Ptr<ASTNode_Block> body,
                     const std::string & _desc,
                     emp::Ptr<Symbol_Scope> _scope,
