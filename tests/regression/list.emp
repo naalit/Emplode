@@ -1,0 +1,63 @@
+// Output: [1, 2, 3]
+// 3
+// 3
+
+// struct List<T> { is_null: bool, head: T, tail: List<T> }
+Struct Null() {
+    Struct s {
+        Var is_null = 1;
+        Var head = 0;
+        Var tail = 0;
+    };
+    RETURN s;
+};
+Struct Cons(head2, tail2) {
+    Struct s {
+        Var is_null = 0;
+        Var head = head2;
+        Struct tail = tail2;
+    };
+    RETURN s;
+};
+
+// Returns -1 if out of bounds
+Var get(list, n) {
+    Var i = 0;
+    WHILE(i < n) {
+        IF (list::is_null == 1) {
+            RETURN -1;
+        }
+        list = list::tail;
+        i = i + 1;
+    }
+    IF (list::is_null == 1) {
+        RETURN -1;
+    }
+    RETURN list::head;
+};
+Var len(list) {
+    Var i = 0;
+    WHILE(list::is_null == 0) {
+        i = i + 1;
+        list = list::tail;
+    }
+    RETURN i;
+};
+Void print_list(list) {
+    Var i = 0;
+    Var length = len(list);
+    Var buf = "[";
+    WHILE(i < length) {
+        IF (i > 0) {
+            buf = buf + ", ";
+        }
+        buf = buf + get(list, i);
+        i = i + 1;
+    }
+    PRINT(buf + "]");
+};
+
+Struct list = Cons(1, Cons(2, Cons(3, Null())));
+print_list(list);
+PRINT(len(list));
+PRINT(get(list, 2));

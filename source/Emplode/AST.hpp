@@ -17,6 +17,7 @@
 
 #include "Symbol.hpp"
 #include "SymbolTableBase.hpp"
+#include <optional>
 
 namespace emplode {
 
@@ -89,6 +90,7 @@ namespace emplode {
     virtual SymbolTableBase & GetSymbolTable() { return parent->GetSymbolTable(); }
 
     virtual symbol_ptr_t Process() = 0;
+    virtual std::optional<Var> AsVar() { return {}; }
 
     virtual void Write(std::ostream & /* os */=std::cout,
                        const std::string & /* offset */="") const { }
@@ -161,6 +163,10 @@ namespace emplode {
     bool HasStringReturn() const override { return GetSymbol().HasStringReturn(); }
 
     bool IsLeaf() const override { return true; }
+
+    std::optional<Var> AsVar() override {
+      return var;
+    }
 
     symbol_ptr_t Process() override { 
       #ifndef NDEBUG
@@ -440,23 +446,20 @@ namespace emplode {
 
     symbol_ptr_t Process() override {
       emp_assert(children.size() == 2);
-      symbol_ptr_t lhs = children[0]->Process();  // Determine the left-hand-side value.
+      std::optional<Var> lhs = children[0]->AsVar();  // Determine the left-hand-side value.
       symbol_ptr_t rhs = children[1]->Process();  // Determine the right-hand-side value.
 
-      #ifndef NDEBUG
-      emp::notify::Verbose(
-        "Emplode::AST",
-        "AST: Assigning: ", lhs->GetName(), " = ", rhs->GetName(), " (", rhs->AsString(), ")"
-      );
-      #endif
-
-      bool success = lhs && lhs->CopyValue(*rhs);
-      if (!success) {
-        std::cerr << "Error: copy to '" << lhs->GetName() << "' failed" << std::endl;
+      if (!lhs.has_value()) {
+        std::cerr << "lhs of assignment is not a variable:" << std::endl;
+        PrintAST(std::cerr);
         exit(1);
       }
+
+      // lhs needs to own its value, so we clone it to make sure that's possible
+      lhs->SetValue(rhs->Clone());
       if (rhs->IsTemporary()) rhs.Delete();
-      return lhs;
+
+      return lhs->GetValue();
     }
 
     void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
@@ -684,13 +687,16 @@ namespace emplode {
     ASTNode_Member(const std::string &name)
       : name(name), ASTNode_Internal(name) {}
 
-    symbol_ptr_t Process() override;
+    std::optional<Var> AsVar() override;
+    symbol_ptr_t Process() override {
+      return AsVar()->GetValue();
+    }
 
     void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
       emp_assert(children.size() == 1);
 
       for (size_t i = 0; i < indent; ++i) os << " ";
-      os << "ASTNode_Ref: " << name << std::endl;
+      os << "ASTNode_Member: " << name << std::endl;
       children[0]->PrintAST(os, indent+2);
     }
   };

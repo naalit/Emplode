@@ -1,0 +1,14 @@
+// Output: 121393
+Var fib(num) {
+    Var i = 0;
+    Var last = 1;
+    Var last2 = 0; // second-to-last
+    WHILE(i < num) {
+        Var next = last + last2;
+        last2 = last;
+        last = next;
+        i = i+1;
+    }
+    RETURN next;
+};
+PRINT(fib(25));
