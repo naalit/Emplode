@@ -113,7 +113,7 @@ namespace emplode {
                                             *type_info_ptr, obj_owned);
 
       // Copy over all of the internal symbols.
-      out->symbol_map = symbol_map;
+      for (auto [name, var] : symbol_map) { out->symbol_map.insert({name, Var(var.GetValue()->Clone())}); }
       // @CAO: Will linkages be in place?
 
       return out;

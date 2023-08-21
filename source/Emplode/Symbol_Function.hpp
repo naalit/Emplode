@@ -117,7 +117,7 @@ namespace emplode {
           }
           for (int i = 0; i < args.size(); i++) {
             auto param = params[i];
-            param.SetValue(args[i]->Clone());
+            param.SetValue(args[i]->ShallowClone());
           }
 
           auto result = body->Process();
@@ -128,7 +128,7 @@ namespace emplode {
               // but the scope is spread out through the entire AST so that's not really possible
               // This is a workaround to allow returning structs, but it's not great -
               // Struct f(a) { RETURN a; } will copy its argument when returning it, which is unexpected
-              ret = ret->DeepClone();
+              ret = ret->Clone();
             }
             result.Delete();
             return ret;

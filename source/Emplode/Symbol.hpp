@@ -261,9 +261,10 @@ namespace emplode {
     operator EmplodeType&() { return *GetObjectPtr(); }
 
     /// Allocate a duplicate of this class.
-    /// This is a shallow clone, so any children or scope members will be passed by reference to the new instance.
+    /// This is a deep clone which also clones any children or scope members.
     virtual symbol_ptr_t Clone() const = 0;
-    virtual symbol_ptr_t DeepClone() const { return Clone(); };
+    /// This is a shallow clone, so any children or scope members will be passed by reference to the new instance.
+    virtual symbol_ptr_t ShallowClone() const { return Clone(); };
 
     virtual const Symbol & Write(std::ostream & os=std::cout, const std::string & prefix="",
                                       size_t comment_offset=32) const

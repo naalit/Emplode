@@ -248,16 +248,16 @@ namespace emplode {
       return *this;
     }
 
-    symbol_ptr_t DeepClone() const override {
+    /// Make a copy of this scope and all of the entries inside it.
+    symbol_ptr_t Clone() const override {
       emp::Ptr<Symbol_Scope> result = emp::NewPtr<Symbol_Scope>(name, desc, scope);
       for (auto [name, var] : symbol_map) {
-        result->symbol_map.insert({name, Var(var.GetValue()->DeepClone())});
+        result->symbol_map.insert({name, Var(var.GetValue()->Clone())});
       }
       return result;
     }
 
-    /// Make a copy of this scope and all of the entries inside it.
-    symbol_ptr_t Clone() const override { return emp::NewPtr<Symbol_Scope>(*this); }
+    symbol_ptr_t ShallowClone() const override { return emp::NewPtr<Symbol_Scope>(*this); }
   };
 
   // This has to be here (or in another downstream file) because of include cycle issues
