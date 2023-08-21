@@ -1,4 +1,4 @@
-// Output: [1, 2, 3]
+// Output: [1, 12, 3]
 // 3
 // 3
 
@@ -24,22 +24,36 @@ Struct Cons(head2, tail2) {
 Var get(list, n) {
     Var i = 0;
     WHILE(i < n) {
-        IF (list::is_null == 1) {
+        IF (list.is_null == 1) {
             RETURN -1;
         }
-        list = list::tail;
+        list = list.tail;
         i = i + 1;
     }
-    IF (list::is_null == 1) {
+    IF (list.is_null == 1) {
         RETURN -1;
     }
-    RETURN list::head;
+    RETURN list.head;
+};
+Var set(list, n, value) {
+    Var i = 0;
+    WHILE(i < n) {
+        IF (list.is_null == 1) {
+            RETURN -1;
+        }
+        list = list.tail;
+        i = i + 1;
+    }
+    IF (list.is_null == 1) {
+        RETURN -1;
+    }
+    list.head = value;
 };
 Var len(list) {
     Var i = 0;
-    WHILE(list::is_null == 0) {
+    WHILE(list.is_null == 0) {
         i = i + 1;
-        list = list::tail;
+        list = list.tail;
     }
     RETURN i;
 };
@@ -58,6 +72,7 @@ Void print_list(list) {
 };
 
 Struct list = Cons(1, Cons(2, Cons(3, Null())));
+set(list, 1, 12);
 print_list(list);
 PRINT(len(list));
 PRINT(get(list, 2));

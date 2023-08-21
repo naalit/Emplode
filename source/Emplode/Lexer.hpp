@@ -45,7 +45,6 @@ namespace emplode {
       token_identifier = AddToken("Identifier", "[a-zA-Z_][a-zA-Z0-9_]*");
       token_number = AddToken("Literal Number", "[0-9]+(\\.[0-9]+)?");
       token_string = AddToken("Literal String", "(\\\"([^\"\\\\]|\\\\.)*\\\")|('([^'\\\\]|\\\\.)*')|(`([^`\\\\]|\\\\.)*`)");
-      token_dots = AddToken("Dots", "\".\"+");
 
       /// Symbol tokens should have least priority.  They include any solitary character not listed
       /// above, or pre-specified multi-character groups.
@@ -56,7 +55,6 @@ namespace emplode {
     bool IsID(const emp::Token token) const noexcept { return token.token_id == token_identifier; }
     bool IsNumber(const emp::Token token) const noexcept { return token.token_id == token_number; }
     bool IsString(const emp::Token token) const noexcept { return token.token_id == token_string; }
-    bool IsDots(const emp::Token token) const noexcept { return token.token_id == token_dots; }
     bool IsSymbol(const emp::Token token) const noexcept { return token.token_id == token_symbol; }
   };
 }

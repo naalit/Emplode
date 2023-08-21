@@ -111,7 +111,6 @@ namespace emplode {
     bool IsID() const { return pos && lexer->IsID(*pos); }
     bool IsNumber() const { return pos && lexer->IsNumber(*pos); }
     bool IsString() const { return pos && lexer->IsString(*pos); }
-    bool IsDots() const { return pos && lexer->IsDots(*pos); }
 
     bool IsSignal() const { return symbol_table->HasSignal(AsLexeme()); }
     bool IsType() const { return symbol_table->HasType(AsLexeme()); }
@@ -314,26 +313,7 @@ namespace emplode {
     Debug("Running ParseVar(", state.AsString(), ",", create_ok, ",", scan_scopes,
           ") at line ", start_line);
 
-    // Check for leading dots to require this scope (one dot) or indicate a lower-level scope.
-    if (state.IsDots()) {
-      Debug("...found dots: ", state.AsLexeme());
-      scan_scopes = false;             // One or more initial dots specify scope; don't scan!
-      size_t num_dots = state.GetTokenSize();  // Extra dots shift scope.
-      emp::Ptr<Symbol_Scope> cur_scope = &state.GetScope();
-      while (num_dots-- > 1) {
-        cur_scope = cur_scope->GetScope();
-        if (cur_scope.IsNull()) state.Error("Too many dots; goes beyond global scope.");
-      }
-      ++state;
-
-      // Recursively call in the found scope if needed; given leading dot, do not scan scopes.
-      if (cur_scope.Raw() != &state.GetScope()) {
-        state.PushScope(*cur_scope);
-        auto result = ParseVar(state, create_ok, false);
-        state.PopScope();
-        return result;
-      }
-    }
+    // TODO before the dots change we could use leading dots to search in a parent scope - is that something we need?
 
     // Next, we must have a variable name.
     // @CAO: Or a : ?  E.g., technically "..:size" could give you the parent scope size.
@@ -347,7 +327,7 @@ namespace emplode {
     Var cur_symbol = state.LookupSymbol(var_name, scan_scopes);
 
     // If this variable just provided a scope, keep going.
-    if (state.IsDots()) {
+    if (state.UseIfLexeme("::")) {
       state.PushScope(cur_symbol.GetValue()->AsScope());
       auto result = ParseVar(state, create_ok, false);
       state.PopScope();
@@ -370,8 +350,8 @@ namespace emplode {
       return out_val;
     }
 
-    // Anything that begins with an identifier or dots must represent a variable.  Refer!
-    if (state.IsID() || state.IsDots()) return ParseVar(state, false, true);
+    // Anything that begins with an identifier must represent a variable.  Refer!
+    if (state.IsID()) return ParseVar(state, false, true);
 
     // A literal number should have a temporary created with its value.
     if (state.IsNumber()) {
@@ -474,8 +454,8 @@ namespace emplode {
     /// Process a value (and possibly more!)
     emp::Ptr<ASTNode> cur_node = ParseValue(state);
 
-    while (state.UseIfLexeme("::")) {
-      state.RequireID("Expected member name after '::'");
+    while (state.UseIfChar('.')) {
+      state.RequireID("Expected member name after '.'");
       std::string name = state.UseLexeme();
       auto node = emp::NewPtr<ASTNode_Member>(name);
       node->AddChild(cur_node);
