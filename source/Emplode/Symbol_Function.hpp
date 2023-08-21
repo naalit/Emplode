@@ -123,13 +123,6 @@ namespace emplode {
           auto result = body->Process();
           if (result && result->IsReturn()) {
             auto ret = result.DynamicCast<Symbol_Special>()->ReturnValue();
-            if (ret) {
-              // Ideally the function would have a new scope each time it runs,
-              // but the scope is spread out through the entire AST so that's not really possible
-              // This is a workaround to allow returning structs, but it's not great -
-              // Struct f(a) { RETURN a; } will copy its argument when returning it, which is unexpected
-              ret = ret->Clone();
-            }
             result.Delete();
             return ret;
           } else {

@@ -440,8 +440,16 @@ namespace emplode {
       if (new_symbol.GetValue()->IsScope()) {
         if (state.UseIfChar('{')) {
           state.PushScope(new_symbol.GetValue()->AsScope());
-          emp::Ptr<ASTNode> out_node = ParseStatementList(state);
+          emp::Ptr<ASTNode_Block> out_node = ParseStatementList(state);
           state.PopScope();
+
+          // At the end of the block, assign the variable to a copy of the created scope
+          // This way, running the same struct declaration twice results in separate struct instances
+          auto clone_node = emp::NewPtr<ASTNode_Clone>();
+          clone_node->AddChild(emp::NewPtr<ASTNode_Leaf>(new_symbol.GetValue()->ShallowClone()));
+          auto var_node = emp::NewPtr<ASTNode_Var>(new_symbol, new_symbol.GetValue()->GetName());
+          out_node->AddChild(emp::NewPtr<ASTNode_Assign>(var_node, clone_node));
+
           state.UseRequiredChar('}', "Expected scope '", new_symbol.GetValue()->GetName(), "' to end with a '}'.");
           return out_node;
         }

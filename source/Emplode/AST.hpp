@@ -316,6 +316,36 @@ namespace emplode {
     }
   };
 
+  class ASTNode_Clone : public ASTNode_Internal {
+  public:
+    ASTNode_Clone(int _line=-1) { 
+      line_id = _line;
+    }
+
+    symbol_ptr_t Process() override {
+      #ifndef NDEBUG
+      emp::notify::Verbose(
+        "Emplode::AST",
+        "AST: Processing clone"
+      );
+      #endif
+      emp_assert(children.size() == 1);
+      symbol_ptr_t result = children[0]->Process();
+      return result->Clone();
+    }
+
+    void Write(std::ostream & os, const std::string & offset) const override { 
+      os << "CLONE ";
+      children[0]->Write(os, offset);
+    }
+
+    void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      for (size_t i = 0; i < indent; ++i) os << " ";
+      os << "ASTNode_Clone" << std::endl;
+      for (auto child : children) child->PrintAST(os, indent+2);
+    }
+  };
+
   /// Unary operations.
   class ASTNode_Return : public ASTNode_Internal {
   public:
