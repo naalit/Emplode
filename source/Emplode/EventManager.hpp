@@ -29,6 +29,7 @@
 
 #include "emp/base/map.hpp"
 #include "emp/base/Ptr.hpp"
+#include "emp/datastructs/map_utils.hpp"
 
 #include "AST.hpp"
 
