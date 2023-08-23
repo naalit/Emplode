@@ -1,0 +1,55 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "emplode",
+	"patterns": [
+		{ "include": "#keyword" },
+		{ "include": "#event" },
+		{ "include": "#function-call" },
+		{ "include": "#types" },
+		{ "include": "#literal" },
+		{ "include": "#comment" },
+		{ "include": "#string" }
+	],
+	"repository": {
+		"function-call": {
+			"match": "\\b([a-zA-Z0-9_\\.]+)\\s*\\(",
+			"captures": {
+				"1": {
+					"name": "entity.name.function.emplode"
+				}
+			}
+		},
+		"types": {
+		    "match": "\\b([A-Z][A-Za-z_0-9]*)",
+		    "name": "entity.name.class.emplode"
+		},
+		"keyword": {
+			"match": "\\b(PRINT|RETURN|WHILE|CONTINUE|BREAK|IF|ELSE)\\b",
+			"name": "keyword.control.emplode"
+		},
+		"event": {
+			"match": "@[a-zA-Z0-9_\\.]+\\b",
+			"name": "entity.name.event.emplode"
+		},
+		"literal": {
+			"match": "[^a-zA-Z]\\d+(\\.\\d+)?",
+			"name": "constant.numeric.emplode"
+		},
+		"comment": {
+			"match": "//.*$",
+			"name": "comment.line.slash.emplode"
+		},
+		"string": {
+			"name": "string.quoted.double.emplode",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.emplode",
+					"match": "\\\\."
+				}
+			]
+		}
+	},
+	"scopeName": "source.emplode"
+}

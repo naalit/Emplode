@@ -1,0 +1,26 @@
+{
+    "name": "emplode-basic",
+    "publisher": "emplode",
+    "displayName": "emplode-basic",
+    "description": "Syntax highlighting support for the Emplode configuration language",
+    "version": "0.0.1",
+    "engines": {
+        "vscode": "^1.53.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "emplode",
+            "aliases": ["Emplode", "emplode"],
+            "extensions": [".emp"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "emplode",
+            "scopeName": "source.emplode",
+            "path": "./syntaxes/emplode.tmLanguage.json"
+        }]
+    }
+}
