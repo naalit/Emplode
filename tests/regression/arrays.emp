@@ -1,0 +1,11 @@
+// Output: [-2, 2, 3, 12]
+// 2
+// 12
+// 3
+Var arr = [1, 2, 3];
+arr.push(12);
+arr[0] = -2;
+PRINT(arr);
+PRINT(arr[1]);
+PRINT(arr.pop());
+PRINT(arr.pop());

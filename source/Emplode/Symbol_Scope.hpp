@@ -260,8 +260,128 @@ namespace emplode {
     symbol_ptr_t ShallowClone() const override { return emp::NewPtr<Symbol_Scope>(*this); }
   };
 
-  // This has to be here (or in another downstream file) because of include cycle issues
-  std::optional<Var> ASTNode_Member::AsVar() {
+  class Symbol_List : public Symbol {
+  private:
+    std::shared_ptr<emp::vector<symbol_ptr_t>> values;
+    emp::Ptr<Symbol_Scope> member_funs;
+
+    template<size_t arity, typename T>
+    void AddMemberFun(std::string name, std::string desc, emp::TypeID ret_type, T fun) {
+      auto wrapped = [name, fun](const std::vector<symbol_ptr_t> &input) {
+        if (input.size() != arity) {
+          std::cerr << "Error: list method '" << name << "' takes " << arity << " arguments, but was given " << input.size() << std::endl;
+          exit(1);
+        }
+        if constexpr (arity == 0) return fun();
+        if constexpr (arity == 1) return fun(input[0]);
+        if constexpr (arity == 2) return fun(input[0], input[1]);
+      };
+      member_funs->AddBuiltinFunction(name, wrapped, desc, ret_type);
+    }
+
+  public:
+    Symbol_List() : Symbol("__List", "List", nullptr) {
+      values = std::make_shared<emp::vector<symbol_ptr_t>>();
+      member_funs.New("List", "List scope", nullptr);
+      AddMemberFun<1>("push", "Add a value to the end of the list", emp::GetTypeID<void>(), [this](symbol_ptr_t value) {
+        if (!value->IsTemporary()) {
+          value = value->ShallowClone();
+        }
+        value->SetTemporary(false);
+        values->push_back(value);
+        return nullptr;
+      });
+      AddMemberFun<0>("pop", "Removes and returns the value at the end of the list", emp::GetTypeID<symbol_ptr_t>(), [this]() {
+        symbol_ptr_t value = values->back();
+        value->SetTemporary();
+        values->pop_back();
+        return value;
+      });
+    }
+
+    ~Symbol_List() {
+      if (values.use_count() == 1) {
+        for (auto i : *values) {
+          i.Delete();
+        }
+      }
+      member_funs.Delete();
+    }
+
+    std::string GetTypename() const override { return "List"; }
+
+    emp::Ptr<Symbol_Scope> AsScopePtr() override {
+      return member_funs;
+    }
+
+    symbol_ptr_t Clone() const override {
+      auto list = emp::NewPtr<Symbol_List>();
+      // TODO Should this call Clone() or ShallowClone() on the inner values?
+      for (auto i : *values) {
+        list->Push(i->Clone());
+      }
+      return list;
+    }
+
+    symbol_ptr_t ShallowClone() const override {
+      auto list = emp::NewPtr<Symbol_List>();
+      list->values = values;
+      return list;
+    }
+
+    void Push(symbol_ptr_t value) {
+      values->push_back(value);
+    }
+
+    LValue Get(size_t idx) {
+      if (idx >= values->size()) {
+        std::cerr << "index " << idx << " out of bounds for list of length " << values->size() << std::endl;
+        exit(1);
+      }
+
+      return LValue(&(*values)[idx]);
+    }
+
+    void Print(std::ostream &os) const override {
+      os << '[';
+      bool first = true;
+      for (auto i : *values) {
+        if (!first)
+          os << ", ";
+        i->Print(os);
+        first = false;
+      }
+      os << ']';
+    }
+  };
+
+  // These has to be here (or in another downstream file) because of include cycle issues
+  emp::Ptr<Symbol> ASTNode_ListInit::Process() {
+    #ifndef NDEBUG
+    emp::notify::Verbose(
+      "Emplode::AST",
+      "AST: Processing list initializer"
+    );
+    #endif
+    auto list = emp::NewPtr<Symbol_List>();
+    list->SetTemporary();
+    for (auto i : children) {
+      symbol_ptr_t value = i->Process();
+      if (!value) {
+        std::cerr << "Expression in list initializer does not produce a value" << std::endl;
+        exit(1);
+      }
+      auto clone = value->ShallowClone();
+      clone->SetTemporary(false);
+      list->Push(clone);
+      if (value->IsTemporary()) {
+        value.Delete();
+      }
+    }
+    return list;
+  }
+
+  std::optional<LValue> ASTNode_Member::AsLValue() {
     emp_assert(children.size() == 1);
 
     auto scope = children[0]->Process()->AsScopePtr();
@@ -270,7 +390,39 @@ namespace emplode {
       PrintAST(std::cerr);
       exit(1);
     }
-    return scope->GetSymbol(name);
+    // In C++23 this would use and_then()
+    auto var = scope->GetSymbol(name);
+    if (var.has_value())
+      return var->AsLValue();
+    else
+      return {};
+  }
+
+  std::optional<LValue> ASTNode_Subscript::AsLValue() {
+    #ifndef NDEBUG
+    emp::notify::Verbose(
+      "Emplode::AST",
+      "AST: Processing subscript"
+    );
+    #endif
+
+    emp_assert(children.size() == 2);
+
+    auto list = children[0]->Process().DynamicCast<Symbol_List>();
+    if (!list) {
+      std::cerr << "tried to use subscript on non-list:" << std::endl;
+      PrintAST(std::cerr);
+      exit(1);
+    }
+
+    auto idx = children[1]->Process()->AsDouble();
+    if (size_t(idx) != idx) {
+      std::cerr << "tried to use subscript with negative or non-integer index " << idx << std::endl;
+      PrintAST(std::cerr);
+      exit(1);
+    }
+
+    return list->Get(idx);
   }
 }
 #endif

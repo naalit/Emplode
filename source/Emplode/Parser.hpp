@@ -239,7 +239,7 @@ namespace emplode {
     Parser() {
       // Setup operator precedence.
       size_t cur_prec = 0;
-      precedence_map["("] = cur_prec++;
+      precedence_map["("] = precedence_map["["] = cur_prec++;
       precedence_map["**"] = cur_prec++;
       precedence_map["*"] = precedence_map["/"] = precedence_map["%"] = cur_prec++;
       precedence_map["+"] = precedence_map["-"] = cur_prec++;
@@ -374,6 +374,19 @@ namespace emplode {
       return out_ast;
     }
 
+    // Parse a list initializer [1, 2, 3]
+    if (state.UseIfChar('[')) {
+      auto list = emp::NewPtr<ASTNode_ListInit>(state.GetLine());
+      while (!state.UseIfChar(']')) {
+        list->AddChild(ParseExpression(state));
+        if (!state.UseIfChar(',')) {
+          state.UseRequiredChar(']', "Expected comma or ] after list element");
+          break;
+        }
+      }
+      return list;
+    }
+
     state.Error("Expected a value, found: ", state.AsLexeme());
 
     return nullptr;
@@ -493,7 +506,15 @@ namespace emplode {
         // function with its arguments, run it, and return the result.
         cur_node = emp::NewPtr<ASTNode_Call>(cur_node, args, op_token.line_id);
       }
-
+      // Do we have an array subscript?
+      else if (op == "[") {
+        auto idx_node = ParseExpression(state);
+        state.UseRequiredChar(']', "Expected a ']' to end subscript index.");
+        auto node = emp::NewPtr<ASTNode_Subscript>();
+        node->AddChild(cur_node);
+        node->AddChild(idx_node);
+        cur_node = node;
+      }
       // Otherwise we must have a binary math operation.
       else {
         emp::Ptr<ASTNode> node2 = ParseExpression(state, false, precedence_map[op]);

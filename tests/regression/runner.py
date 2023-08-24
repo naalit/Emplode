@@ -6,7 +6,7 @@ import subprocess
 success = 0
 failure = 0
 
-for test in ["hello_world", "functions", "refs", "fib", "list"]:
+for test in ["hello_world", "functions", "refs", "fib", "list", "arrays"]:
     # Find expected output
     file = open(test + ".emp", "r")
     line = file.readline()

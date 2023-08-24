@@ -21,6 +21,24 @@
 
 namespace emplode {
 
+  class LValue {
+  private:
+    emp::Ptr<emp::Ptr<Symbol>> ptr;
+
+  public:
+    LValue(emp::Ptr<emp::Ptr<Symbol>> ptr) : ptr(ptr) {}
+
+    emp::Ptr<Symbol> GetValue() const {
+      return *ptr;
+    }
+
+    void SetValue(emp::Ptr<Symbol> value) {
+      ptr->Delete();
+      *ptr = value;
+      (*ptr)->SetTemporary(false);
+    }
+  };
+
   /// A variable representing a shared mutable reference to a Symbol
   class Var {
   private:
@@ -48,6 +66,10 @@ namespace emplode {
       ptr->Delete();
       *ptr = value;
       (*ptr)->SetTemporary(false);
+    }
+
+    LValue AsLValue() {
+      return LValue(&*ptr);
     }
   };
 
@@ -90,7 +112,7 @@ namespace emplode {
     virtual SymbolTableBase & GetSymbolTable() { return parent->GetSymbolTable(); }
 
     virtual symbol_ptr_t Process() = 0;
-    virtual std::optional<Var> AsVar() { return {}; }
+    virtual std::optional<LValue> AsLValue() { return {}; }
 
     virtual void Write(std::ostream & /* os */=std::cout,
                        const std::string & /* offset */="") const { }
@@ -164,8 +186,8 @@ namespace emplode {
 
     bool IsLeaf() const override { return true; }
 
-    std::optional<Var> AsVar() override {
-      return var;
+    std::optional<LValue> AsLValue() override {
+      return var.AsLValue();
     }
 
     symbol_ptr_t Process() override { 
@@ -346,7 +368,21 @@ namespace emplode {
     }
   };
 
-  /// Unary operations.
+  class ASTNode_ListInit : public ASTNode_Internal {
+  public:
+    ASTNode_ListInit(int _line = -1) {
+      line_id = _line;
+    }
+
+    symbol_ptr_t Process() override;
+
+    void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      for (size_t i = 0; i < indent; ++i) os << " ";
+      os << "ASTNode_ListInit" << std::endl;
+      for (auto child : children) child->PrintAST(os, indent+2);
+    }
+  };
+
   class ASTNode_Return : public ASTNode_Internal {
   public:
     ASTNode_Return(int _line=-1) { 
@@ -476,11 +512,11 @@ namespace emplode {
 
     symbol_ptr_t Process() override {
       emp_assert(children.size() == 2);
-      std::optional<Var> lhs = children[0]->AsVar();  // Determine the left-hand-side value.
+      std::optional<LValue> lhs = children[0]->AsLValue();  // Determine the left-hand-side value.
       symbol_ptr_t rhs = children[1]->Process();  // Determine the right-hand-side value.
 
       if (!lhs.has_value()) {
-        std::cerr << "lhs of assignment is not a variable:" << std::endl;
+        std::cerr << "lhs of assignment is not an lvalue:" << std::endl;
         PrintAST(std::cerr);
         exit(1);
       }
@@ -717,9 +753,9 @@ namespace emplode {
     ASTNode_Member(const std::string &name)
       : name(name), ASTNode_Internal(name) {}
 
-    std::optional<Var> AsVar() override;
+    std::optional<LValue> AsLValue() override;
     symbol_ptr_t Process() override {
-      return AsVar()->GetValue();
+      return AsLValue()->GetValue();
     }
 
     void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
@@ -727,6 +763,24 @@ namespace emplode {
 
       for (size_t i = 0; i < indent; ++i) os << " ";
       os << "ASTNode_Member: " << name << std::endl;
+      children[0]->PrintAST(os, indent+2);
+    }
+  };
+
+  class ASTNode_Subscript : public ASTNode_Internal {
+  public:
+    ASTNode_Subscript() : ASTNode_Internal() {}
+
+    std::optional<LValue> AsLValue() override;
+    symbol_ptr_t Process() override {
+      return AsLValue()->GetValue();
+    }
+
+    void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      emp_assert(children.size() == 2);
+
+      for (size_t i = 0; i < indent; ++i) os << " ";
+      os << "ASTNode_Subscript: " << name << std::endl;
       children[0]->PrintAST(os, indent+2);
     }
   };
