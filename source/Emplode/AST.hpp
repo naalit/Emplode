@@ -353,7 +353,9 @@ namespace emplode {
       #endif
       emp_assert(children.size() == 1);
       symbol_ptr_t result = children[0]->Process();
-      return result->Clone();
+      result = result->Clone();
+      result->SetTemporary();
+      return result;
     }
 
     void Write(std::ostream & os, const std::string & offset) const override { 

@@ -3,7 +3,7 @@
 Var Add(one, two) {
     RETURN one + two;
 };
-Var MyPrint(message) {
+Void MyPrint(message) {
     PRINT(message);
     RETURN;
 };

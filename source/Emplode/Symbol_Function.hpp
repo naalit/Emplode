@@ -123,6 +123,11 @@ namespace emplode {
           auto result = body->Process();
           if (result && result->IsReturn()) {
             auto ret = result.DynamicCast<Symbol_Special>()->ReturnValue();
+            // Avoid leaking pointers to local variables which could be deleted if this function runs again
+            if (ret && !ret->IsTemporary()) {
+              ret = ret->ShallowClone();
+              ret->SetTemporary();
+            }
             result.Delete();
             return ret;
           } else {
