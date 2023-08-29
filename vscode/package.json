@@ -14,7 +14,7 @@
         "languages": [{
             "id": "emplode",
             "aliases": ["Emplode", "emplode"],
-            "extensions": [".emp"],
+            "extensions": [".emp", ".mabe"],
             "configuration": "./language-configuration.json"
         }],
         "grammars": [{
