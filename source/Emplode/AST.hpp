@@ -524,8 +524,9 @@ namespace emplode {
       }
 
       // lhs needs to own its value, so we clone it to make sure that's possible
-      lhs->SetValue(rhs->ShallowClone());
-      if (rhs->IsTemporary()) rhs.Delete();
+      if (!rhs->IsTemporary())
+        rhs = rhs->ShallowClone();
+      lhs->SetValue(rhs);
 
       return lhs->GetValue();
     }
