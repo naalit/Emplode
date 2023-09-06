@@ -262,7 +262,7 @@ namespace emplode {
                                                   bool scan_scopes=true);
 
     /// Load a value from the provided scope, which can come from a variable or a literal.
-    [[nodiscard]] emp::Ptr<ASTNode> ParseValue(ParseState & state);
+    [[nodiscard]] emp::Ptr<ASTNode> ParseValue(ParseState & state, bool create_variables);
 
     /// Calculate the result of the provided operation on two computed entries.
     [[nodiscard]] emp::Ptr<ASTNode> ProcessOperation(const emp::Token & op_token,
@@ -278,7 +278,7 @@ namespace emplode {
                                                     size_t prec_limit=1000);
 
     /// Parse the declaration of a variable and return the newly created Symbol
-    Var ParseDeclaration(ParseState & state);
+    emp::Ptr<ASTNode> ParseDeclaration(ParseState & state);
 
     /// Parse an event description.
     emp::Ptr<ASTNode> ParseEvent(ParseState & state);
@@ -324,34 +324,42 @@ namespace emplode {
     Debug("...looking up symbol '", var_name,
           "' starting at scope '", state.GetScopeName(),
           "'; scanning=", scan_scopes);
-    Var cur_symbol = state.LookupSymbol(var_name, scan_scopes);
+    std::optional<Var> cur_symbol = state.GetScope().LookupSymbol(var_name, scan_scopes);
+    if (!cur_symbol.has_value()) {
+      if (create_ok && state.AsLexeme() == "=") {
+        cur_symbol = state.AddLocalVar(var_name, "Local variable created by assignment");
+      } else {
+        state.Error("'", var_name, "' does not exist as a parameter, variable, or type.",
+              "  Current scope is '", state.GetScope().GetName(), "'");
+      }
+    }
 
     // If this variable just provided a scope, keep going.
     if (state.UseIfLexeme("::")) {
-      state.PushScope(cur_symbol.GetValue()->AsScope());
+      state.PushScope(cur_symbol->GetValue()->AsScope());
       auto result = ParseVar(state, create_ok, false);
       state.PopScope();
       return result;
     }
 
     // Otherwise return the variable as a leaf!
-    return emp::NewPtr<ASTNode_Var>(cur_symbol, var_name, start_line);
+    return emp::NewPtr<ASTNode_Var>(*cur_symbol, var_name, start_line);
   }
 
   // Load a value from the provided scope, which can come from a variable or a literal.
-  emp::Ptr<ASTNode> Parser::ParseValue(ParseState & state) {
+  emp::Ptr<ASTNode> Parser::ParseValue(ParseState & state, bool create_variables) {
     Debug("Running ParseValue(", state.AsString(), ")");
 
     // First check for a unary negation at the start of the value.
     if (state.UseIfChar('-')) {
       auto out_val = emp::NewPtr<ASTNode_Op1>("unary negation", state.GetLine());
       out_val->SetFun( [](double val){ return -val; } );
-      out_val->AddChild(ParseValue(state));
+      out_val->AddChild(ParseValue(state, false));
       return out_val;
     }
 
     // Anything that begins with an identifier must represent a variable.  Refer!
-    if (state.IsID()) return ParseVar(state, false, true);
+    if (state.IsID()) return ParseVar(state, create_variables, true);
 
     // A literal number should have a temporary created with its value.
     if (state.IsNumber()) {
@@ -440,50 +448,30 @@ namespace emplode {
     Debug("Running ParseExpression(", state.AsString(), ", decl_ok=", decl_ok, ", limit=", prec_limit, ")");
 
     // Allow this statement to be a declaration if it begins with a type.
+    emp::Ptr<ASTNode> cur_node;
     if (decl_ok && state.IsType()) {
-      Var new_symbol = ParseDeclaration(state);
-
-      // Functions can't be used while they're being defined, so return them now
-      if (new_symbol.GetValue()->IsFunction()) {
-        return emp::NewPtr<ASTNode_Var>(new_symbol, new_symbol.GetValue()->GetName());
-      }
+      cur_node = ParseDeclaration(state);
  
       // If this symbol is a new scope, it can be populated now either directly (in braces)
       // or indirectly (with an assignment)
-      if (new_symbol.GetValue()->IsScope()) {
-        if (state.UseIfChar('{')) {
-          emp::Ptr<Symbol_Scope> scope = new_symbol.GetValue()->AsScopePtr();
-          // Make a new scope with an inaccessible name to use for initialization
-          // This would work for objects too but having multiple objects of the same type causes problems in MABE's trait system
-          if (!scope->IsObject()) {
-            scope = state
-              .AddScope(new_symbol.GetValue()->GetName() + "'", "Local struct initialization scope")
-              .GetValue()->AsScopePtr();
-          }
-          state.PushScope(*scope);
-          emp::Ptr<ASTNode_Block> out_node = ParseStatementList(state);
-          state.PopScope();
+      if (state.UseIfChar('{')) {
+        emp::Ptr<Symbol_Scope> scope = emp::NewPtr<Symbol_Scope>("<struct initialization scope>", "struct initialization scope", &state.GetScope());
+        state.PushScope(*scope);
+        emp::Ptr<ASTNode_Block> out_node = ParseStatementList(state);
+        state.PopScope();
 
-          // At the end of the block, assign the variable to a copy of the created scope
-          // This way, running the same struct declaration twice results in separate struct instances
-          if (!scope->IsObject()) {
-            auto clone_node = emp::NewPtr<ASTNode_Clone>();
-            clone_node->AddChild(emp::NewPtr<ASTNode_Leaf>(scope));
-            auto var_node = emp::NewPtr<ASTNode_Var>(new_symbol, scope->GetName());
-            out_node->AddChild(emp::NewPtr<ASTNode_Assign>(var_node, clone_node));
-          }
+        auto copy_node = emp::NewPtr<ASTNode_CopyFields>();
+        copy_node->AddChild(cur_node);
+        copy_node->AddChild(emp::NewPtr<ASTNode_Leaf>(scope));
+        out_node->AddChild(copy_node);
 
-          state.UseRequiredChar('}', "Expected scope '", scope->GetName(), "' to end with a '}'.");
-          return out_node;
-        }
-      }      
-
-      // Otherwise rewind so that the new variable can be used to start an expression.
-      --state;
+        state.UseRequiredChar('}', "Expected scope '", scope->GetName(), "' to end with a '}'.");
+        return out_node;
+      }
+    } else {
+      /// Process a value (and possibly more!)
+      cur_node = ParseValue(state, state.GetScope().GetName() == "<struct initialization scope>");
     }
-
-    /// Process a value (and possibly more!)
-    emp::Ptr<ASTNode> cur_node = ParseValue(state);
 
     while (state.UseIfChar('.')) {
       state.RequireID("Expected member name after '.'");
@@ -541,7 +529,7 @@ namespace emplode {
   }
 
   // Parse an the declaration of a variable.
-  Var Parser::ParseDeclaration(ParseState & state) {
+  emp::Ptr<ASTNode> Parser::ParseDeclaration(ParseState & state) {
     std::string type_name = state.UseLexeme();
     state.RequireID("Type name '", type_name, "' must be followed by variable to declare.");
     std::string var_name = state.UseLexeme();
@@ -568,15 +556,19 @@ namespace emplode {
       state.UseRequiredChar('}', "Function body must end with '{'");
       state.PopScope();
 
-      return state.AddFunction(var_name, "Local function.", type_name, params, body_block, scope);
+      return emp::NewPtr<ASTNode_Var>(state.AddFunction(var_name, "Local function.", type_name, params, body_block, scope), var_name);
     }
 
-    if (type_name == "Var") return state.AddLocalVar(var_name, "Local variable.");
-    else if (type_name == "Struct") return state.AddScope(var_name, "Local struct");
+    if (type_name == "Var") return emp::NewPtr<ASTNode_Var>(state.AddLocalVar(var_name, "Local variable."), var_name);
+    else if (type_name == "Struct") return emp::NewPtr<ASTNode_Var>(state.AddScope(var_name, "Local struct"), var_name);
 
     // Otherwise we have an object of a custom type to add.
     Debug("Building object '", var_name, "' of type '", type_name, "'");
-    return state.AddObject(type_name, var_name);
+    Var var = state.AddLocalVar(var_name, "Local object.");
+    // If we're about to assign to the object, don't initialize it
+    if (state.AsLexeme() == "=")
+      return emp::NewPtr<ASTNode_Var>(var, var_name);
+    return emp::NewPtr<ASTNode_Assign>(emp::NewPtr<ASTNode_Var>(var, var_name), emp::NewPtr<ASTNode_ClassInit>(&state.GetSymbolTable().GetType(type_name), var_name));
   }
 
   // Parse an event description.

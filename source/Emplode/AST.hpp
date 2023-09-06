@@ -338,6 +338,50 @@ namespace emplode {
     }
   };
 
+  class ASTNode_CopyFields : public ASTNode_Internal {
+  public:
+    ASTNode_CopyFields(int _line=-1) {
+      line_id = _line;
+    }
+
+    symbol_ptr_t Process() override;
+
+    void Write(std::ostream & os, const std::string & offset) const override { 
+      os << "COPY_FIELDS ";
+      for (auto child : children) child->Write(os, offset);
+    }
+
+    void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      for (size_t i = 0; i < indent; ++i) os << " ";
+      os << "ASTNode_CopyFields" << std::endl;
+      for (auto child : children) child->PrintAST(os, indent+2);
+    }
+  };
+
+  class ASTNode_ClassInit : public ASTNode_Internal {
+  private:
+    emp::Ptr<TypeInfo> type;
+    std::string name;
+
+  public:
+    ASTNode_ClassInit(emp::Ptr<TypeInfo> type, std::string name="__temp", int _line=-1) : type(type), name(name) {
+      line_id = _line;
+    }
+
+    symbol_ptr_t Process() override;
+
+    void Write(std::ostream & os, const std::string & offset) const override { 
+      os << "CLASS_INIT ";
+      children[0]->Write(os, offset);
+    }
+
+    void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      for (size_t i = 0; i < indent; ++i) os << " ";
+      os << "ASTNode_ClassInit" << std::endl;
+      for (auto child : children) child->PrintAST(os, indent+2);
+    }
+  };
+
   class ASTNode_Clone : public ASTNode_Internal {
   public:
     ASTNode_Clone(int _line=-1) { 

@@ -14,6 +14,7 @@
 #ifndef EMPLODE_SYMBOL_SCOPE_HPP
 #define EMPLODE_SYMBOL_SCOPE_HPP
 
+#include "AST.hpp"
 #include "emp/base/map.hpp"
 #include "emp/datastructs/map_utils.hpp"
 #include <optional>
@@ -99,6 +100,19 @@ namespace emplode {
       return true;
     }
 
+    void CopyFields(const Symbol_Scope & in) {
+      for (const auto & [name, var] : in.symbol_map) {
+        if (symbol_map.contains(name)) {
+          symbol_map.at(name).SetValue(var.GetValue());
+        } else {
+          if (var.GetValue()->GetDesc() == "Local variable created by assignment") {
+            std::cerr << "Assignment to nonexistent member '" << name << "' of object or struct when initializing" << std::endl;
+            exit(1);
+          }
+          symbol_map.insert({name, Var(var.GetValue())});
+        }
+      }
+    }
 
     /// Get a symbol out of this scope; 
     std::optional<Var> GetSymbol(std::string name) {
@@ -379,6 +393,26 @@ namespace emplode {
       }
     }
     return list;
+  }
+
+  emp::Ptr<Symbol> ASTNode_CopyFields::Process() {
+    #ifndef NDEBUG
+    emp::notify::Verbose(
+      "Emplode::AST",
+      "AST: Processing copy fields"
+    );
+    #endif
+    emp_assert(children.size() == 2);
+    symbol_ptr_t lhs = children[0]->Process();
+    symbol_ptr_t rhs = children[1]->Process();
+    auto lhs_scope = lhs->AsScopePtr();
+    auto rhs_scope = rhs->AsScopePtr();
+    if (!lhs_scope || !rhs_scope) {
+      std::cerr << "ASTNode_CopyFields needs two scope operands" << std::endl;
+      exit(1);
+    }
+    lhs_scope->CopyFields(*rhs_scope);
+    return nullptr;
   }
 
   std::optional<LValue> ASTNode_Member::AsLValue() {

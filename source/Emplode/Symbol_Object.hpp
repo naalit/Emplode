@@ -131,5 +131,20 @@ namespace emplode {
     return Add<Symbol_Object>(name, desc, this, obj_ptr, type_info, obj_owned);
   }
 
+  // AST node to create an object
+  emp::Ptr<Symbol> ASTNode_ClassInit::Process() {
+    #ifndef NDEBUG
+    emp::notify::Verbose(
+      "Emplode::AST",
+      "AST: Processing class init"
+    );
+    #endif
+    auto obj = type->MakeObj(name);
+    auto symbol = emp::NewPtr<Symbol_Object>(name, type->GetDesc(), nullptr, obj, *type, type->GetOwned());
+    obj->Setup(symbol->AsScope());
+    symbol->SetTemporary();
+    return symbol;
+  }
+
 }
 #endif
