@@ -371,14 +371,33 @@ namespace emplode {
     symbol_ptr_t Process() override;
 
     void Write(std::ostream & os, const std::string & offset) const override { 
-      os << "CLASS_INIT ";
-      children[0]->Write(os, offset);
+      os << "CLASS_INIT " << name;
     }
 
     void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
       for (size_t i = 0; i < indent; ++i) os << " ";
-      os << "ASTNode_ClassInit" << std::endl;
-      for (auto child : children) child->PrintAST(os, indent+2);
+      os << "ASTNode_ClassInit " << name << std::endl;
+    }
+  };
+
+  class ASTNode_StructInit : public ASTNode_Internal {
+  private:
+    std::string name;
+
+  public:
+    ASTNode_StructInit(std::string name="__temp", int _line=-1) : name(name) {
+      line_id = _line;
+    }
+
+    symbol_ptr_t Process() override;
+
+    void Write(std::ostream & os, const std::string & offset) const override { 
+      os << "STRUCT_INIT " << name;
+    }
+
+    void PrintAST(std::ostream & os=std::cout, size_t indent=0) override {
+      for (size_t i = 0; i < indent; ++i) os << " ";
+      os << "ASTNode_StructInit " << name << std::endl;
     }
   };
 
@@ -550,11 +569,17 @@ namespace emplode {
       line_id = _line;
     }
 
-    bool IsNumeric() const override { return children[0]->IsNumeric(); }
-    bool IsString() const override { return children[0]->IsString(); }
+    // Assign inherits the name of the left-hand side, i.e. the name of the variable being assigned to
+    const std::string & GetName() const override {
+      return children[0]->GetName();
+    }
+
+    // Assign returns the new value, so type checking functions forward to the rhs
+    bool IsNumeric() const override { return children[1]->IsNumeric(); }
+    bool IsString() const override { return children[1]->IsString(); }
     bool HasValue() const override { return true; }
-    bool HasNumericReturn() const override { return children[0]->HasNumericReturn(); }
-    bool HasStringReturn() const override { return children[0]->HasStringReturn(); }
+    bool HasNumericReturn() const override { return children[1]->HasNumericReturn(); }
+    bool HasStringReturn() const override { return children[1]->HasStringReturn(); }
 
     symbol_ptr_t Process() override {
       emp_assert(children.size() == 2);

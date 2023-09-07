@@ -455,7 +455,8 @@ namespace emplode {
       // If this symbol is a new scope, it can be populated now either directly (in braces)
       // or indirectly (with an assignment)
       if (state.UseIfChar('{')) {
-        emp::Ptr<Symbol_Scope> scope = emp::NewPtr<Symbol_Scope>("<struct initialization scope>", "struct initialization scope", &state.GetScope());
+        auto name = cur_node->GetName();
+        emp::Ptr<Symbol_Scope> scope = state.AddScope(name + "'", "Struct initialization scope").GetValue()->AsScopePtr();
         state.PushScope(*scope);
         emp::Ptr<ASTNode_Block> out_node = ParseStatementList(state);
         state.PopScope();
@@ -465,12 +466,12 @@ namespace emplode {
         copy_node->AddChild(emp::NewPtr<ASTNode_Leaf>(scope));
         out_node->AddChild(copy_node);
 
-        state.UseRequiredChar('}', "Expected scope '", scope->GetName(), "' to end with a '}'.");
+        state.UseRequiredChar('}', "Expected scope '", name, "' to end with a '}'.");
         return out_node;
       }
     } else {
       /// Process a value (and possibly more!)
-      cur_node = ParseValue(state, state.GetScope().GetName() == "<struct initialization scope>");
+      cur_node = ParseValue(state, state.GetScope().GetDesc() == "Struct initialization scope");
     }
 
     while (state.UseIfChar('.')) {
@@ -560,7 +561,13 @@ namespace emplode {
     }
 
     if (type_name == "Var") return emp::NewPtr<ASTNode_Var>(state.AddLocalVar(var_name, "Local variable."), var_name);
-    else if (type_name == "Struct") return emp::NewPtr<ASTNode_Var>(state.AddScope(var_name, "Local struct"), var_name);
+    else if (type_name == "Struct") {
+      Var var = state.AddLocalVar(var_name, "Local struct.");
+      // If we're about to assign to the object, don't initialize it
+      if (state.AsLexeme() == "=")
+        return emp::NewPtr<ASTNode_Var>(var, var_name);
+      return emp::NewPtr<ASTNode_Assign>(emp::NewPtr<ASTNode_Var>(var, var_name), emp::NewPtr<ASTNode_StructInit>(var_name));
+    }
 
     // Otherwise we have an object of a custom type to add.
     Debug("Building object '", var_name, "' of type '", type_name, "'");

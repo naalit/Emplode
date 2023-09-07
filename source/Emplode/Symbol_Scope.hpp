@@ -103,13 +103,13 @@ namespace emplode {
     void CopyFields(const Symbol_Scope & in) {
       for (const auto & [name, var] : in.symbol_map) {
         if (symbol_map.contains(name)) {
-          symbol_map.at(name).SetValue(var.GetValue());
+          symbol_map.at(name).SetValue(var.GetValue()->ShallowClone());
         } else {
           if (var.GetValue()->GetDesc() == "Local variable created by assignment") {
             std::cerr << "Assignment to nonexistent member '" << name << "' of object or struct when initializing" << std::endl;
             exit(1);
           }
-          symbol_map.insert({name, Var(var.GetValue())});
+          symbol_map.insert({name, Var(var.GetValue()->ShallowClone())});
         }
       }
     }
@@ -395,6 +395,18 @@ namespace emplode {
     return list;
   }
 
+  emp::Ptr<Symbol> ASTNode_StructInit::Process() {
+    #ifndef NDEBUG
+    emp::notify::Verbose(
+      "Emplode::AST",
+      "AST: Processing struct initializer"
+    );
+    #endif
+    auto scope = emp::NewPtr<Symbol_Scope>(name, "Local struct", nullptr);
+    scope->SetTemporary();
+    return scope;
+  }
+
   emp::Ptr<Symbol> ASTNode_CopyFields::Process() {
     #ifndef NDEBUG
     emp::notify::Verbose(
@@ -412,6 +424,9 @@ namespace emplode {
       exit(1);
     }
     lhs_scope->CopyFields(*rhs_scope);
+    // Rhs might be temporary and should be deleted, but lhs is the target and should never be temporary
+    if (rhs->IsTemporary())
+      rhs.Delete();
     return nullptr;
   }
 

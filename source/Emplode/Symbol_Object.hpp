@@ -118,6 +118,10 @@ namespace emplode {
 
       return out;
     }
+
+    emp::Ptr<Symbol> ShallowClone() const override {
+      return emp::NewPtr<Symbol_Object>(GetName(), GetDesc(), nullptr, obj_ptr, *type_info_ptr, obj_owned);
+    }
   };
 
   // Definition needed to add an object to an existing scope.
