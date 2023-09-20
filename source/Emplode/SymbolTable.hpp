@@ -200,7 +200,7 @@ namespace emplode {
 
       // Use the TypeInfo associated with the provided type name to build an instance.
       emp::Ptr<EmplodeType> new_obj = type_info.MakeObj("__Temp");
-      auto new_symbol = emp::NewPtr<Symbol_Object>("__Temp", "", nullptr, new_obj, type_info, true);
+      auto new_symbol = emp::NewPtr<Symbol_Object>("__Temp", "", nullptr, new_obj, type_info, true, this);
 
       new_symbol->SetTemporary();                              // Mark new symbol to be deleted.
       new_obj->Setup(*new_symbol);                             // Setup new object with its symbol.

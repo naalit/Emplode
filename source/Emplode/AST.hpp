@@ -18,58 +18,107 @@
 #include "Symbol.hpp"
 #include "SymbolTableBase.hpp"
 #include <optional>
+#include <variant>
 
 namespace emplode {
-
-  class LValue {
-  private:
-    emp::Ptr<emp::Ptr<Symbol>> ptr;
-
-  public:
-    LValue(emp::Ptr<emp::Ptr<Symbol>> ptr) : ptr(ptr) {}
-
-    emp::Ptr<Symbol> GetValue() const {
-      return *ptr;
-    }
-
-    void SetValue(emp::Ptr<Symbol> value) {
-      ptr->Delete();
-      *ptr = value;
-      (*ptr)->SetTemporary(false);
-    }
-  };
-
   /// A variable representing a shared mutable reference to a Symbol
   class Var {
   private:
+    using symbol_ptr_t = std::shared_ptr<emp::Ptr<Symbol>>;
+    using funs_ptr_t = std::shared_ptr<std::pair<std::function<emp::Ptr<Symbol>()>, std::function<void(emp::Ptr<Symbol>)>>>;
+
     /// A pointer to a pointer so that we can update the value to any type of symbol
     /// The inner pointer is not shared, though - it's owned by this variable
-    std::shared_ptr<emp::Ptr<Symbol>> ptr;
+    std::variant<
+      symbol_ptr_t,
+      funs_ptr_t
+    > ptr;
+
+    template<typename T, typename U> auto map(T var, U funs) {
+      if (std::holds_alternative<symbol_ptr_t>(ptr)) {
+        return var(std::get<symbol_ptr_t>(ptr));
+      } else {
+        return funs(std::get<funs_ptr_t>(ptr));
+      }
+    }
+    template<typename T, typename U> auto map(T var, U funs) const {
+      if (std::holds_alternative<symbol_ptr_t>(ptr)) {
+        return var(std::get<symbol_ptr_t>(ptr));
+      } else {
+        return funs(std::get<funs_ptr_t>(ptr));
+      }
+    }
 
   public:
     /// Takes ownership of `initial_value`
     Var(emp::Ptr<Symbol> initial_value) : ptr(std::make_shared<emp::Ptr<Symbol>>(initial_value)) {
-      (*ptr)->SetTemporary(false);
+      (*std::get<symbol_ptr_t>(ptr))->SetTemporary(false);
     }
+    Var(std::function<emp::Ptr<Symbol>()> get, std::function<void(emp::Ptr<Symbol>)> set)
+      : ptr(std::make_shared<std::pair<std::function<emp::Ptr<Symbol>()>, std::function<void(emp::Ptr<Symbol>)>>>(std::make_pair(get, set))) {}
+
     ~Var() {
-      if (ptr.use_count() == 1) {
-        ptr->Delete();
-      }
+      map(
+        [](auto ptr) {
+          if (ptr.use_count() == 1) {
+            ptr->Delete();
+          }
+        },
+        [](auto ptr) {}
+      );
     }
 
     emp::Ptr<Symbol> GetValue() const {
-      return *ptr;
+      return map(
+        [](auto ptr) {
+          return *ptr;
+        },
+        [](auto funs) {
+          return funs->first();
+        }
+      );
     }
 
     /// Takes ownership of `value`
     void SetValue(emp::Ptr<Symbol> value) {
-      ptr->Delete();
-      *ptr = value;
-      (*ptr)->SetTemporary(false);
+      return map(
+        [&](auto ptr) {
+          ptr->Delete();
+          *ptr = value;
+          (*ptr)->SetTemporary(false);
+        },
+        [&](auto funs) {
+          funs->second(value);
+        }
+      );
+    }
+  };
+
+  class LValue {
+  private:
+    std::variant<emp::Ptr<emp::Ptr<Symbol>>, Var> ptr;
+
+  public:
+    LValue(emp::Ptr<emp::Ptr<Symbol>> ptr) : ptr(ptr) {}
+    LValue(Var &var) : ptr(var) {}
+
+    emp::Ptr<Symbol> GetValue() const {
+      if (std::holds_alternative<emp::Ptr<emp::Ptr<Symbol>>>(ptr)) {
+        return *std::get<0>(ptr);
+      } else {
+        return std::get<1>(ptr).GetValue();
+      }
     }
 
-    LValue AsLValue() {
-      return LValue(&*ptr);
+    void SetValue(emp::Ptr<Symbol> value) {
+      if (std::holds_alternative<emp::Ptr<emp::Ptr<Symbol>>>(ptr)) {
+          auto ptr = std::get<0>(this->ptr);
+          ptr->Delete();
+          *ptr = value;
+          (*ptr)->SetTemporary(false);
+      } else {
+        std::get<1>(ptr).SetValue(value);
+      }
     }
   };
 
@@ -187,7 +236,7 @@ namespace emplode {
     bool IsLeaf() const override { return true; }
 
     std::optional<LValue> AsLValue() override {
-      return var.AsLValue();
+      return LValue(var);
     }
 
     symbol_ptr_t Process() override { 
@@ -361,10 +410,12 @@ namespace emplode {
   class ASTNode_ClassInit : public ASTNode_Internal {
   private:
     emp::Ptr<TypeInfo> type;
+    emp::Ptr<SymbolTableBase> symbol_table;
     std::string name;
 
   public:
-    ASTNode_ClassInit(emp::Ptr<TypeInfo> type, std::string name="__temp", int _line=-1) : type(type), name(name) {
+    ASTNode_ClassInit(emp::Ptr<TypeInfo> type, emp::Ptr<SymbolTableBase> symbol_table, std::string name="__temp", int _line=-1)
+      : symbol_table(symbol_table), type(type), name(name) {
       line_id = _line;
     }
 

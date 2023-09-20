@@ -33,8 +33,9 @@ namespace emplode {
                   emp::Ptr<Symbol_Scope> _scope,
                   emp::Ptr<EmplodeType> _obj,
                   TypeInfo & _type_info,
-                  bool _owned)
-      : Symbol_Scope(_name, _desc, _scope)
+                  bool _owned,
+                  emp::Ptr<SymbolTableBase> symbol_table)
+      : Symbol_Scope(_name, _desc, _scope, symbol_table)
       , obj_ptr(_obj), type_info_ptr(&_type_info), obj_owned(_owned) { }
       
     Symbol_Object(const Symbol_Object & in) = delete;
@@ -110,7 +111,7 @@ namespace emplode {
 
       // Build the new Symbol_Object.
       auto out = emp::NewPtr<Symbol_Object>(out_name, GetDesc(), out_scope, out_obj,
-                                            *type_info_ptr, obj_owned);
+                                            *type_info_ptr, obj_owned, symbol_table);
 
       // Copy over all of the internal symbols.
       for (auto [name, var] : symbol_map) { out->symbol_map.insert({name, Var(var.GetValue()->Clone())}); }
@@ -120,7 +121,7 @@ namespace emplode {
     }
 
     emp::Ptr<Symbol> ShallowClone() const override {
-      return emp::NewPtr<Symbol_Object>(GetName(), GetDesc(), nullptr, obj_ptr, *type_info_ptr, obj_owned);
+      return emp::NewPtr<Symbol_Object>(GetName(), GetDesc(), nullptr, obj_ptr, *type_info_ptr, obj_owned, symbol_table);
     }
   };
 
@@ -132,7 +133,7 @@ namespace emplode {
     TypeInfo & type_info,
     bool obj_owned
   ) {
-    return Add<Symbol_Object>(name, desc, this, obj_ptr, type_info, obj_owned);
+    return Add<Symbol_Object>(name, desc, this, obj_ptr, type_info, obj_owned, symbol_table);
   }
 
   // AST node to create an object
@@ -144,7 +145,7 @@ namespace emplode {
     );
     #endif
     auto obj = type->MakeObj(name);
-    auto symbol = emp::NewPtr<Symbol_Object>(name, type->GetDesc(), nullptr, obj, *type, type->GetOwned());
+    auto symbol = emp::NewPtr<Symbol_Object>(name, type->GetDesc(), nullptr, obj, *type, type->GetOwned(), symbol_table);
     obj->Setup(symbol->AsScope());
     symbol->SetTemporary();
     return symbol;

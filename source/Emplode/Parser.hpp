@@ -575,7 +575,10 @@ namespace emplode {
     // If we're about to assign to the object, don't initialize it
     if (state.AsLexeme() == "=")
       return emp::NewPtr<ASTNode_Var>(var, var_name);
-    return emp::NewPtr<ASTNode_Assign>(emp::NewPtr<ASTNode_Var>(var, var_name), emp::NewPtr<ASTNode_ClassInit>(&state.GetSymbolTable().GetType(type_name), var_name));
+    return emp::NewPtr<ASTNode_Assign>(
+      emp::NewPtr<ASTNode_Var>(var, var_name),
+      emp::NewPtr<ASTNode_ClassInit>(&state.GetSymbolTable().GetType(type_name), &state.GetSymbolTable(), var_name)
+    );
   }
 
   // Parse an event description.

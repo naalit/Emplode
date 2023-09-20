@@ -21,7 +21,6 @@
 
 #include "Symbol.hpp"
 #include "Symbol_Function.hpp"
-#include "Symbol_Linked.hpp"
 #include "TypeInfo.hpp"
 
 namespace emplode {
@@ -35,6 +34,7 @@ namespace emplode {
     using symbol_ptr_t = emp::Ptr<Symbol>;
     using const_symbol_ptr_t = emp::Ptr<const Symbol>;
     emp::map< std::string, Var > symbol_map;   ///< Map of names to entries.
+    emp::Ptr<SymbolTableBase> symbol_table;
 
     template <typename T, typename... ARGS>
     Var Add(const std::string & name, ARGS &&... args) {
@@ -53,8 +53,10 @@ namespace emplode {
     }
 
   public:
+    Symbol_Scope(const std::string & _name, const std::string & _desc, emp::Ptr<Symbol_Scope> _scope, emp::Ptr<SymbolTableBase> symbol_table)
+      : Symbol(_name, _desc, _scope), symbol_table(symbol_table) {}
     Symbol_Scope(const std::string & _name, const std::string & _desc, emp::Ptr<Symbol_Scope> _scope)
-      : Symbol(_name, _desc, _scope) { }
+      : Symbol(_name, _desc, _scope), symbol_table(_scope ? _scope->symbol_table : nullptr) {}
 
     std::string GetTypename() const override { return "Scope"; }
 
@@ -146,8 +148,14 @@ namespace emplode {
                                         VAR_T & var,
                                         const std::string & desc,
                                         bool is_builtin = false) {
-      if (is_builtin) return AddBuiltin<Symbol_Linked<VAR_T>>(name, var, desc, this);
-      return Add<Symbol_Linked<VAR_T>>(name, var, desc, this);
+      VAR_T* ptr = &var;
+      auto get_fun = [ptr]() -> VAR_T {
+        return *ptr;
+      };
+      auto set_fun = [ptr](const VAR_T & x) -> void {
+        *ptr = x;
+      };
+      return LinkFuns(name, std::function(get_fun), std::function(set_fun), desc, is_builtin);
     }
 
     /// Add a configuration symbol that interacts through a pair of functions - the functions are
@@ -158,10 +166,19 @@ namespace emplode {
                                             std::function<void(const VAR_T &)> set_fun,
                                             const std::string & desc,
                                             bool is_builtin = false) {
+      emp_always_assert(symbol_table != nullptr, "Cannot call LinkFuns() or LinkVar() on a scope without a symbol table");
+      emp_always_assert(!emp::Has(symbol_map, name), "Do not redeclare functions or variables!",
+                 name);
+      auto entry = symbol_map.insert({name, Var([symbol_table=symbol_table, get_fun]() {
+        return symbol_table->ValueToSymbol(get_fun(), "get function");
+      }, [set_fun](emp::Ptr<Symbol> value) {
+        set_fun(value->As<VAR_T>());
+      })});
+      Var var = entry.first->second;
       if (is_builtin) {
-        return AddBuiltin<Symbol_LinkedFunctions<VAR_T>>(name, get_fun, set_fun, desc, this);
+        var.GetValue()->SetBuiltin();
       }
-      return Add<Symbol_LinkedFunctions<VAR_T>>(name, get_fun, set_fun, desc, this);
+      return var;
     }
 
     /// Add an internal variable of type String.
@@ -296,7 +313,7 @@ namespace emplode {
   public:
     Symbol_List() : Symbol("__List", "List", nullptr) {
       values = std::make_shared<emp::vector<symbol_ptr_t>>();
-      member_funs.New("List", "List scope", nullptr);
+      member_funs.New("List", "List scope", nullptr, nullptr);
       AddMemberFun<1>("push", "Add a value to the end of the list", emp::GetTypeID<void>(), [this](symbol_ptr_t value) {
         if (!value->IsTemporary()) {
           value = value->ShallowClone();
@@ -442,7 +459,7 @@ namespace emplode {
     // In C++23 this would use and_then()
     auto var = scope->GetSymbol(name);
     if (var.has_value())
-      return var->AsLValue();
+      return LValue(*var);
     else
       return {};
   }
