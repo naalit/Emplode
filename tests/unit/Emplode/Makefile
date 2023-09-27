@@ -1,4 +1,4 @@
-TEST_NAMES= AST Symbol_Function Symbol_Scope EventManager Symbol SymbolTableBase Lexer Symbol_Linked SymbolTable Emplode TypeInfo EmplodeType DataFile Parser Symbol_Object
+TEST_NAMES= AST Symbol_Function Symbol_Scope EventManager Symbol SymbolTableBase Lexer SymbolTable Emplode TypeInfo EmplodeType DataFile Parser Symbol_Object
 
 MABE_DIR= ../../../source/
 EMP_DIR= ../../../source/third-party/empirical

@@ -59,21 +59,21 @@ namespace emplode {
 
     ~Var() {
       map(
-        [](auto ptr) {
+        [](auto &ptr) {
           if (ptr.use_count() == 1) {
             ptr->Delete();
           }
         },
-        [](auto ptr) {}
+        [](auto &ptr) {}
       );
     }
 
     emp::Ptr<Symbol> GetValue() const {
       return map(
-        [](auto ptr) {
+        [](auto &ptr) {
           return *ptr;
         },
-        [](auto funs) {
+        [](auto &funs) {
           return funs->first();
         }
       );
@@ -82,12 +82,12 @@ namespace emplode {
     /// Takes ownership of `value`
     void SetValue(emp::Ptr<Symbol> value) {
       return map(
-        [&](auto ptr) {
+        [&](auto &ptr) {
           ptr->Delete();
           *ptr = value;
           (*ptr)->SetTemporary(false);
         },
-        [&](auto funs) {
+        [&](auto &funs) {
           funs->second(value);
         }
       );

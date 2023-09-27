@@ -54,7 +54,7 @@ namespace emplode {
 
   public:
     SymbolTable(const std::string & name)
-    : root_scope(name, "Global scope", nullptr), event_manager(*this) {
+    : root_scope(name, "Global scope", nullptr, this), event_manager(*this) {
       // Initialize the type map.
       type_map["INVALID"] = emp::NewPtr<TypeInfo>( *this, 0, "/*ERROR*/", "Error, Invalid type!" );
       type_map["Void"] = emp::NewPtr<TypeInfo>( *this, 1, "Void", "Non-type variable; no value" );
