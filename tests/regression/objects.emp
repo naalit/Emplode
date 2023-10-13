@@ -1,0 +1,13 @@
+// Output: message one: 4
+// message two: 2
+
+MyObject m {
+    message = "message one";
+};
+
+m.counter = 4;
+m.PrintMessage(); // message one: 4
+
+m.message = "message two";
+m.counter = m.counter + 2;
+PRINT(m.message); // message two: 2

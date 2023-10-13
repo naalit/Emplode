@@ -173,6 +173,9 @@ namespace emplode {
         return symbol_table->ValueToSymbol(get_fun(), "get function");
       }, [set_fun](emp::Ptr<Symbol> value) {
         set_fun(value->As<VAR_T>());
+        if (value->IsTemporary()) {
+          value.Delete();
+        }
       })});
       Var var = entry.first->second;
       if (is_builtin) {
